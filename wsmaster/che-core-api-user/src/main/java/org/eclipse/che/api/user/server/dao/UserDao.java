@@ -32,8 +32,8 @@ import org.eclipse.che.api.core.UnauthorizedException;
 public interface UserDao {
 
     /**
-     * // TODO consider removing this method from dao
-     * Gets user by his email/alias/name and password.
+     * // TODO remove this method from dao
+     * Authenticates user.
      *
      * @param emailOrAliasOrName
      *         one of the user identifiers such as email/name/alias
@@ -57,7 +57,7 @@ public interface UserDao {
      * @throws NullPointerException
      *         when {@code user} is null
      * @throws ConflictException
-     *         when user with such id/alias/name already exists
+     *         when user with such id/alias/email/name already exists
      * @throws ServerException
      *         when any other error occurs
      */
@@ -68,63 +68,83 @@ public interface UserDao {
      *
      * @param user
      *         user to update
+     * @throws NullPointerException
+     *         when {@code user} is null
      * @throws NotFoundException
-     *         when user is not found
+     *         when user with id {@code user.getId()} doesn't exist
      * @throws ConflictException
-     *         when given user cannot be updated
+     *         when any of the id/alias/email/name updated with a value
+     *         which is not unique
      * @throws ServerException
      *         when any other error occurs
      */
     void update(UserImpl user) throws NotFoundException, ServerException, ConflictException;
 
     /**
-     * Removes user from persistent layer by his identifier.
+     * Removes user.
+     *
+     * <p>It is up to implementation to do cascade removing of dependent data or
+     * to forbid removing at all.
+     *
+     * <p>Note that this method doesn't throw any exception when
+     * user doesn't exist.
      *
      * @param id
      *         user identifier
+     * @throws NullPointerException
+     *         when {@code id} is null
      * @throws ConflictException
      *         when given user cannot be deleted
      * @throws ServerException
      *         when any other error occurs
      */
-    void remove(String id) throws NotFoundException, ServerException, ConflictException;
+    void remove(String id) throws ServerException, ConflictException;
 
     /**
-     * Gets user from persistent layer by any of his aliases
+     * Finds user by his alias.
+     *
+     * <p>This method doesn't work for user's email or name.
+     * If it is necessary to get user by name use {@link #getByName(String)} method instead.
      *
      * @param alias
      *         user name or alias
-     * @return user POJO
+     * @return user instance, never null
+     * @throws NullPointerException
+     *         when {@code alias} is null
      * @throws NotFoundException
-     *         when user doesn't exist
+     *         when user with given {@code alias} doesn't exist
      * @throws ServerException
      *         when any other error occurs
      */
     UserImpl getByAlias(String alias) throws NotFoundException, ServerException;
 
     /**
-     * Gets user from persistent layer by his identifier
+     * Finds user by his identifier.
      *
      * @param id
      *         user identifier
-     * @return user POJO
+     * @return user instance, never null
+     * @throws NullPointerException
+     *         when {@code id} is null
      * @throws NotFoundException
-     *         when user doesn't exist
+     *         when user with given {@code id} doesn't exist
      * @throws ServerException
      *         when any other error occurs
      */
     UserImpl getById(String id) throws NotFoundException, ServerException;
 
     /**
-     * Gets user from persistent layer by his username
+     * Finds user by his name.
      *
-     * @param userName
+     * @param name
      *         user name
-     * @return user POJO
+     * @return user instance, never null
+     * @throws NullPointerException
+     *         when {@code name} is null
      * @throws NotFoundException
-     *         when user doesn't exist
+     *         when user with such {@code name} doesn't exist
      * @throws ServerException
      *         when any other error occurs
      */
-    UserImpl getByName(String userName) throws NotFoundException, ServerException;
+    UserImpl getByName(String name) throws NotFoundException, ServerException;
 }
