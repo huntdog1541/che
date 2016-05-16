@@ -18,7 +18,7 @@ import org.eclipse.che.api.user.server.dao.PreferenceDao;
 import org.eclipse.che.api.user.server.dao.Profile;
 import org.eclipse.che.api.user.server.dao.User;
 import org.eclipse.che.api.user.server.dao.UserDao;
-import org.eclipse.che.api.user.server.dao.UserProfileDao;
+import org.eclipse.che.api.user.server.dao.ProfileDao;
 import org.eclipse.che.api.user.shared.dto.ProfileDescriptor;
 import org.eclipse.che.commons.json.JsonHelper;
 import org.everrest.core.impl.ApplicationContextImpl;
@@ -85,7 +85,7 @@ public class UserProfileServiceTest {
     private static final String SERVICE_PATH = BASE_URI + "/profile";
 
     @Mock
-    private UserProfileDao     profileDao;
+    private ProfileDao         profileDao;
     @Mock
     private UserDao            userDao;
     @Mock
@@ -107,7 +107,7 @@ public class UserProfileServiceTest {
         resources.addResource(UserProfileService.class, null);
         final DependencySupplierImpl dependencies = new DependencySupplierImpl();
         dependencies.addComponent(UserDao.class, userDao);
-        dependencies.addComponent(UserProfileDao.class, profileDao);
+        dependencies.addComponent(ProfileDao.class, profileDao);
         dependencies.addComponent(PreferenceDao.class, preferenceDao);
         final URI uri = new URI(BASE_URI);
         final ContainerRequest req = new ContainerRequest(null, uri, uri, null, null, securityContext);

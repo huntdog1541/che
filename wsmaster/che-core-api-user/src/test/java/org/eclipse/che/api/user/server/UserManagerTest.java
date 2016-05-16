@@ -10,12 +10,11 @@
  *******************************************************************************/
 package org.eclipse.che.api.user.server;
 
-import org.eclipse.che.api.core.BadRequestException;
 import org.eclipse.che.api.user.server.dao.PreferenceDao;
 import org.eclipse.che.api.user.server.dao.Profile;
 import org.eclipse.che.api.user.server.dao.User;
 import org.eclipse.che.api.user.server.dao.UserDao;
-import org.eclipse.che.api.user.server.dao.UserProfileDao;
+import org.eclipse.che.api.user.server.dao.ProfileDao;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.testng.MockitoTestNGListener;
@@ -26,7 +25,6 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyMapOf;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -39,11 +37,11 @@ import static org.mockito.Mockito.verify;
 public class UserManagerTest {
 
     @Mock
-    UserDao userDao;
+    UserDao       userDao;
     @Mock
-    UserProfileDao profileDao;
+    ProfileDao    profileDao;
     @Mock
-    PreferenceDao  preferenceDao;
+    PreferenceDao preferenceDao;
 
     @InjectMocks
     UserManager manager;

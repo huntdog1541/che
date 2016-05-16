@@ -11,14 +11,14 @@ public interface Profile {
 
     /**
      * Returns the identifier of the user {@link User#getId()}
-     * whom this profile belongs to.
+     * whom this profile belongs to, which must be also considered
+     * as profile identifier.
      */
     String getId();
 
     /**
-     * Returns the email of the user{@link User#getEmail()}
-     * whom this profile belongs to. The email value is updatable by the
-     * {@link User} object.
+     * Returns the email of the user {@link User#getEmail()} whom this
+     * profile belongs to. The email value is updatable by the {@link User} object.
      */
     String getEmail();
 

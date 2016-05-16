@@ -24,7 +24,7 @@ import org.eclipse.che.api.user.server.dao.PreferenceDao;
 import org.eclipse.che.api.user.server.dao.Profile;
 import org.eclipse.che.api.user.server.dao.User;
 import org.eclipse.che.api.user.server.dao.UserDao;
-import org.eclipse.che.api.user.server.dao.UserProfileDao;
+import org.eclipse.che.api.user.server.dao.ProfileDao;
 import org.eclipse.che.api.user.shared.dto.ProfileDescriptor;
 import org.eclipse.che.commons.env.EnvironmentContext;
 import org.eclipse.che.dto.server.DtoFactory;
@@ -89,12 +89,12 @@ public class UserProfileService extends Service {
     // Using the lazy weak version of Striped so the locks will be created on demand and not eagerly, and garbage collected when not needed anymore.
     private static final Striped<Lock> preferencesUpdateLocksByUser = Striped.lazyWeakLock(1000);
 
-    private final UserProfileDao profileDao;
-    private final UserDao        userDao;
-    private final PreferenceDao  preferenceDao;
+    private final ProfileDao    profileDao;
+    private final UserDao       userDao;
+    private final PreferenceDao preferenceDao;
 
     @Inject
-    public UserProfileService(UserProfileDao profileDao, PreferenceDao preferenceDao, UserDao userDao) {
+    public UserProfileService(ProfileDao profileDao, PreferenceDao preferenceDao, UserDao userDao) {
         this.profileDao = profileDao;
         this.userDao = userDao;
         this.preferenceDao = preferenceDao;

@@ -20,7 +20,7 @@ import org.eclipse.che.api.project.server.FolderEntry;
 import org.eclipse.che.api.project.server.importer.ProjectImporter;
 import org.eclipse.che.api.project.server.type.ProjectTypeDef;
 import org.eclipse.che.api.project.server.type.ValueProviderFactory;
-import org.eclipse.che.api.user.server.dao.UserProfileDao;
+import org.eclipse.che.api.user.server.dao.ProfileDao;
 import org.eclipse.che.api.vfs.VirtualFile;
 import org.eclipse.che.api.vfs.VirtualFileSystem;
 import org.eclipse.che.commons.lang.NameGenerator;
@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
 public class SubversionProjectImporterTest {
 
     @Mock
-    private UserProfileDao userProfileDao;
+    private ProfileDao userProfileDao;
 
     @Mock
     private CredentialsProvider credentialsProvider;
@@ -72,7 +72,7 @@ public class SubversionProjectImporterTest {
                 Multibinder.newSetBinder(binder(), ValueProviderFactory.class).addBinding()
                            .to(SubversionValueProviderFactory.class);
 
-                bind(UserProfileDao.class).toInstance(userProfileDao);
+                bind(ProfileDao.class).toInstance(userProfileDao);
                 bind(CredentialsProvider.class).toInstance(credentialsProvider);
                 bind(RepositoryUrlProvider.class).toInstance(repositoryUrlProvider);
             }

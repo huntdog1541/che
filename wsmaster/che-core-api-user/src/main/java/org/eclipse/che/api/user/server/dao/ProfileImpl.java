@@ -21,7 +21,7 @@ import java.util.Objects;
  *
  * @author Yevhenii Voevodin
  */
-public class ProfileImpl {
+public class ProfileImpl implements Profile {
 
     private String              id;
     private String              email;
@@ -44,14 +44,17 @@ public class ProfileImpl {
         this(profile.getId(), profile.getEmail(), profile.getAttributes());
     }
 
+    @Override
     public String getId() {
         return id;
     }
 
+    @Override
     public String getEmail() {
         return email;
     }
 
+    @Override
     public Map<String, String> getAttributes() {
         if (attributes == null) {
             this.attributes = new HashMap<>();

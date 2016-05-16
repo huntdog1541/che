@@ -31,12 +31,10 @@ public interface PreferenceDao {
      *         new preferences, if preferences are empty - removes user preferences
      * @throws NullPointerException
      *         when preferences or userId is null
-     * @throws NotFoundException
-     *         when user with given identifier doesn't exist
      * @throws ServerException
      *         when any other error occurs
      */
-    void setPreferences(String userId, Map<String, String> preferences) throws ServerException, NotFoundException;
+    void setPreferences(String userId, Map<String, String> preferences) throws ServerException;
 
     /**
      * Gets user preferences.
