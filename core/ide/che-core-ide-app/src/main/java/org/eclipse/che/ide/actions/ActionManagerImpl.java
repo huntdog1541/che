@@ -26,6 +26,7 @@ import org.eclipse.che.ide.api.action.DefaultActionGroup;
 import org.eclipse.che.ide.api.action.IdeActions;
 import org.eclipse.che.ide.api.action.Presentation;
 import org.eclipse.che.ide.api.action.PromisableAction;
+import org.eclipse.che.ide.api.constraints.Constraints;
 import org.eclipse.che.ide.api.parts.PerspectiveManager;
 import org.eclipse.che.ide.ui.toolbar.PresentationFactory;
 import org.eclipse.che.ide.util.Pair;
@@ -107,7 +108,8 @@ public class ActionManagerImpl implements ActionManager {
 
         DefaultActionGroup buildContextMenuGroup = new DefaultActionGroup("Maven", true, this);
         registerAction(IdeActions.GROUP_BUILD_CONTEXT_MENU, buildContextMenuGroup);
-        mainContextMenuGroup.add(buildContextMenuGroup);
+        mainContextMenuGroup.addSeparator();
+        mainContextMenuGroup.add(buildContextMenuGroup, Constraints.LAST);
 
         DefaultActionGroup runContextMenuGroup = new DefaultActionGroup(IdeActions.GROUP_RUN_CONTEXT_MENU, false, this);
         registerAction(IdeActions.GROUP_RUN_CONTEXT_MENU, runContextMenuGroup);
