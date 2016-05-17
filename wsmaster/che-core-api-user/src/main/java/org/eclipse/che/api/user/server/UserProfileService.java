@@ -11,6 +11,14 @@
 package org.eclipse.che.api.user.server;
 
 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+
+import com.google.common.util.concurrent.Striped;
+
 import org.eclipse.che.api.core.ConflictException;
 import org.eclipse.che.api.core.NotFoundException;
 import org.eclipse.che.api.core.ServerException;
@@ -29,18 +37,9 @@ import org.eclipse.che.api.user.shared.dto.ProfileDescriptor;
 import org.eclipse.che.commons.env.EnvironmentContext;
 import org.eclipse.che.commons.subject.Subject;
 import org.eclipse.che.dto.server.DtoFactory;
-
-import com.google.common.util.concurrent.Striped;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.security.RolesAllowed;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -54,24 +53,22 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriBuilder;
-
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
 
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_CURRENT_USER_PROFILE;
+import static com.google.common.base.Strings.nullToEmpty;
+import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_CURRENT_USER_PROFILE;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_USER_PROFILE_BY_ID;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_REMOVE_ATTRIBUTES;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_REMOVE_PREFERENCES;
+import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_CURRENT_USER_PROFILE;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_PREFERENCES;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_USER_PROFILE_BY_ID;
-import static com.google.common.base.Strings.nullToEmpty;
-import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
-
-import java.util.concurrent.locks.Lock;
 
 /**
  * User Profile API
@@ -85,7 +82,7 @@ import java.util.concurrent.locks.Lock;
 public class UserProfileService extends Service {
 
     private static final Logger LOG = LoggerFactory.getLogger(UserProfileService.class);
-    
+
     // Assuming 1000 concurrent users at most trying to update their preferences (if more they will wait for another user to finish).
     // Using the lazy weak version of Striped so the locks will be created on demand and not eagerly, and garbage collected when not needed anymore.
     private static final Striped<Lock> preferencesUpdateLocksByUser = Striped.lazyWeakLock(1000);
@@ -119,7 +116,6 @@ public class UserProfileService extends Service {
             @ApiResponse(code = 404, message = "Not Found"),
             @ApiResponse(code = 500, message = "Internal Server Error")})
     @GET
-    @RolesAllowed({"user", "temp_user"})
     @GenerateLink(rel = LINK_REL_GET_CURRENT_USER_PROFILE)
     @Produces(APPLICATION_JSON)
     public ProfileDescriptor getCurrent(@Context SecurityContext context) throws NotFoundException, ServerException {
@@ -133,19 +129,18 @@ public class UserProfileService extends Service {
      * Returns preferences for current user
      */
     @ApiOperation(value = "Get user preferences",
-            notes = "Get user preferences, like SSH keys, recently opened project and files. It is possible " +
-                    "to use a filter, e.g. CodenvyAppState or ssh.key.public.github.com to get the last opened project " +
-                    "or a public part of GitHub SSH key (if any)",
-            response = ProfileDescriptor.class)
+                  notes = "Get user preferences, like SSH keys, recently opened project and files. It is possible " +
+                          "to use a filter, e.g. CodenvyAppState or ssh.key.public.github.com to get the last opened project " +
+                          "or a public part of GitHub SSH key (if any)",
+                  response = ProfileDescriptor.class)
     @ApiResponses(value = {
             @ApiResponse(code = 200, message = "OK"),
             @ApiResponse(code = 500, message = "Internal Server Error")})
     @GET
     @Path("/prefs")
     @Produces(APPLICATION_JSON)
-    @RolesAllowed({"user", "temp_user"})
     public Map<String, String> getPreferences(@ApiParam(value = "Filer")
-                                                  @QueryParam("filter") String filter) throws ServerException {
+                                              @QueryParam("filter") String filter) throws ServerException {
         if (filter != null) {
             return preferenceDao.getPreferences(currentUser().getUserId(), filter);
         }
@@ -164,7 +159,6 @@ public class UserProfileService extends Service {
      */
 
     @POST
-    @RolesAllowed("user")
     @GenerateLink(rel = LINK_REL_UPDATE_CURRENT_USER_PROFILE)
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON)
@@ -200,7 +194,7 @@ public class UserProfileService extends Service {
 
     @POST
     @Path("/{id}")
-    @RolesAllowed({"system/admin"})
+    //TODO Cover with permissions
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON)
     public ProfileDescriptor update(@PathParam("id") String profileId,
@@ -239,7 +233,6 @@ public class UserProfileService extends Service {
             @ApiResponse(code = 500, message = "Internal Server Error")})
     @GET
     @Path("/{id}")
-    @RolesAllowed({"user", "system/admin", "system/manager"})
     @Produces(APPLICATION_JSON)
     public ProfileDescriptor getById(@ApiParam(value = "  ID")
                                      @PathParam("id")
@@ -266,7 +259,6 @@ public class UserProfileService extends Service {
      */
     @POST
     @Path("/prefs")
-    @RolesAllowed({"user", "temp_user"})
     @GenerateLink(rel = LINK_REL_UPDATE_PREFERENCES)
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON)
@@ -276,7 +268,7 @@ public class UserProfileService extends Service {
         if (update == null || update.isEmpty()) {
             throw new ConflictException("Preferences to update required");
         }
-        
+
         String userId = currentUser().getUserId();
         // Keep the lock in a variable so it isn't garbage collected while in use
         Lock lock = preferencesUpdateLocksByUser.get(userId);
@@ -313,7 +305,6 @@ public class UserProfileService extends Service {
     @DELETE
     @Path("/attributes")
     @GenerateLink(rel = LINK_REL_REMOVE_ATTRIBUTES)
-    @RolesAllowed({"user", "temp_user"})
     @Consumes(APPLICATION_JSON)
     public void removeAttributes(@ApiParam(value = "Attributes", required = true)
                                  @Required
@@ -352,7 +343,6 @@ public class UserProfileService extends Service {
     @DELETE
     @Path("/prefs")
     @GenerateLink(rel = LINK_REL_REMOVE_PREFERENCES)
-    @RolesAllowed({"user", "temp_user"})
     @Consumes(APPLICATION_JSON)
     public void removePreferences(@ApiParam(value = "Preferences to remove", required = true)
                                   @Required
@@ -382,61 +372,55 @@ public class UserProfileService extends Service {
     /* package-private used in tests*/ProfileDescriptor toDescriptor(Profile profile, SecurityContext context) {
         final UriBuilder uriBuilder = getServiceContext().getServiceUriBuilder();
         final List<Link> links = new LinkedList<>();
-        if (context.isUserInRole("user")) {
-            links.add(LinksHelper.createLink(HttpMethod.GET,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "getCurrent")
-                                                       .build()
-                                                       .toString(),
-                                             null,
-                                             APPLICATION_JSON,
-                                             LINK_REL_GET_CURRENT_USER_PROFILE));
-            links.add(LinksHelper.createLink(HttpMethod.GET,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "getById")
-                                                       .build(profile.getId())
-                                                       .toString(),
-                                             null,
-                                             APPLICATION_JSON,
-                                             LINK_REL_GET_USER_PROFILE_BY_ID));
-            links.add(LinksHelper.createLink(HttpMethod.POST,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "updateCurrent")
-                                                       .build()
-                                                       .toString(),
-                                             APPLICATION_JSON,
-                                             APPLICATION_JSON,
-                                             LINK_REL_UPDATE_CURRENT_USER_PROFILE));
-            links.add(LinksHelper.createLink(HttpMethod.POST,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "updatePreferences")
-                                                       .build()
-                                                       .toString(),
-                                             APPLICATION_JSON,
-                                             APPLICATION_JSON,
-                                             LINK_REL_UPDATE_PREFERENCES));
-        }
-        if (context.isUserInRole("system/admin") || context.isUserInRole("system/manager")) {
-            links.add(LinksHelper.createLink(HttpMethod.GET,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "getById")
-                                                       .build(profile.getId())
-                                                       .toString(),
-                                             null,
-                                             APPLICATION_JSON,
-                                             LINK_REL_GET_USER_PROFILE_BY_ID));
-        }
-        if (context.isUserInRole("system/admin")) {
-            links.add(LinksHelper.createLink(HttpMethod.POST,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "update")
-                                                       .build(profile.getId())
-                                                       .toString(),
-                                             APPLICATION_JSON,
-                                             APPLICATION_JSON,
-                                             LINK_REL_UPDATE_USER_PROFILE_BY_ID));
-        }
-        return DtoFactory.getInstance().createDto(ProfileDescriptor.class)
+        links.add(LinksHelper.createLink(HttpMethod.GET,
+                                         uriBuilder.clone()
+                                                   .path(getClass(), "getCurrent")
+                                                   .build()
+                                                   .toString(),
+                                         null,
+                                         APPLICATION_JSON,
+                                         LINK_REL_GET_CURRENT_USER_PROFILE));
+        links.add(LinksHelper.createLink(HttpMethod.GET,
+                                         uriBuilder.clone()
+                                                   .path(getClass(), "getById")
+                                                   .build(profile.getId())
+                                                   .toString(),
+                                         null,
+                                         APPLICATION_JSON,
+                                         LINK_REL_GET_USER_PROFILE_BY_ID));
+        links.add(LinksHelper.createLink(HttpMethod.POST,
+                                         uriBuilder.clone()
+                                                   .path(getClass(), "updateCurrent")
+                                                   .build()
+                                                   .toString(),
+                                         APPLICATION_JSON,
+                                         APPLICATION_JSON,
+                                         LINK_REL_UPDATE_CURRENT_USER_PROFILE));
+        links.add(LinksHelper.createLink(HttpMethod.POST,
+                                         uriBuilder.clone()
+                                                   .path(getClass(), "updatePreferences")
+                                                   .build()
+                                                   .toString(),
+                                         APPLICATION_JSON,
+                                         APPLICATION_JSON,
+                                         LINK_REL_UPDATE_PREFERENCES));
+        links.add(LinksHelper.createLink(HttpMethod.GET,
+                                         uriBuilder.clone()
+                                                   .path(getClass(), "getById")
+                                                   .build(profile.getId())
+                                                   .toString(),
+                                         null,
+                                         APPLICATION_JSON,
+                                         LINK_REL_GET_USER_PROFILE_BY_ID));
+        links.add(LinksHelper.createLink(HttpMethod.POST,
+                                         uriBuilder.clone()
+                                                   .path(getClass(), "update")
+                                                   .build(profile.getId())
+                                                   .toString(),
+                                         APPLICATION_JSON,
+                                         APPLICATION_JSON,
+                                         LINK_REL_UPDATE_USER_PROFILE_BY_ID));
+        return DtoFactory.newDto(ProfileDescriptor.class)
                          .withId(profile.getId())
                          .withUserId(profile.getUserId())
                          .withAttributes(profile.getAttributes())

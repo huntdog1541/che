@@ -45,7 +45,6 @@ import org.everrest.core.impl.uri.UriBuilderImpl;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.testng.MockitoTestNGListener;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Listeners;
@@ -58,7 +57,6 @@ import java.lang.reflect.Field;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 
 import static com.jayway.restassured.RestAssured.given;
@@ -123,10 +121,9 @@ public class StackServiceTest {
     private static final String ICON_MEDIA_TYPE = "image/svg+xml";
 
     @SuppressWarnings("unused")
-    static final   EnvironmentFilter  FILTER = new EnvironmentFilter();
+    static final EnvironmentFilter  FILTER = new EnvironmentFilter();
     @SuppressWarnings("unused")
-    static final   ApiExceptionMapper MAPPER = new ApiExceptionMapper();
-    private static LinkedList<String> ROLES  = new LinkedList<>(Collections.singletonList("user"));
+    static final ApiExceptionMapper MAPPER = new ApiExceptionMapper();
 
     private List<String> tags = asList("java", "maven");
     private StackDto             stackDto;
@@ -231,12 +228,6 @@ public class StackServiceTest {
                                       .getDeclaredField("uriInfo");
         uriField.setAccessible(true);
         uriField.set(service, uriInfo);
-    }
-
-    @AfterMethod
-    public void cleanUp() {
-        ROLES.remove("system/admin");
-        ROLES.remove("system/manager");
     }
 
     /** Create stack */
@@ -602,7 +593,7 @@ public class StackServiceTest {
 
     @Test
     public void foreignStackIconShouldBeDeletedForAdmin() throws NotFoundException, ServerException {
-        ROLES.add("system/admin");
+        //TODO Fix tests with admin
         when(stackDao.getById(foreignStack.getId())).thenReturn(foreignStack);
 
         Response response = given().auth()
@@ -663,7 +654,7 @@ public class StackServiceTest {
     @Filter
     public static class EnvironmentFilter implements RequestFilter {
         public void doFilter(GenericContainerRequest request) {
-            EnvironmentContext.getCurrent().setSubject(new SubjectImpl("user", USER_ID, "token", ROLES, false));
+            EnvironmentContext.getCurrent().setSubject(new SubjectImpl("user", USER_ID, "token", false));
         }
     }
 }
