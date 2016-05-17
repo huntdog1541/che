@@ -22,15 +22,19 @@ import org.eclipse.che.api.project.server.VirtualFileEntry;
 import org.eclipse.che.commons.xml.XMLTreeException;
 import org.eclipse.che.dto.server.DtoFactory;
 import org.eclipse.che.ide.ext.java.shared.dto.Problem;
-import org.eclipse.che.plugin.maven.server.MavenServerWrapper;
-import org.eclipse.che.plugin.maven.server.MavenWrapperManager;
-import org.eclipse.che.plugin.maven.server.core.MavenProgressNotifier;
-import org.eclipse.che.plugin.maven.server.core.MavenProjectManager;
-import org.eclipse.che.plugin.maven.server.core.classpath.ClasspathManager;
-import org.eclipse.che.plugin.maven.server.core.project.MavenProject;
 import org.eclipse.che.ide.maven.tools.Model;
 import org.eclipse.che.maven.data.MavenProjectProblem;
 import org.eclipse.che.maven.server.MavenTerminal;
+import org.eclipse.che.plugin.maven.server.MavenServerWrapper;
+import org.eclipse.che.plugin.maven.server.MavenWrapperManager;
+import org.eclipse.che.plugin.maven.server.core.EclipseWorkspaceProvider;
+import org.eclipse.che.plugin.maven.server.core.MavenProgressNotifier;
+import org.eclipse.che.plugin.maven.server.core.MavenProjectManager;
+import org.eclipse.che.plugin.maven.server.core.MavenWorkspace;
+import org.eclipse.che.plugin.maven.server.core.classpath.ClasspathManager;
+import org.eclipse.che.plugin.maven.server.core.project.MavenProject;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.Document;
@@ -39,6 +43,7 @@ import org.slf4j.LoggerFactory;
 import org.xml.sax.SAXParseException;
 
 import javax.ws.rs.GET;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -60,10 +65,12 @@ import static javax.ws.rs.core.MediaType.TEXT_XML;
 public class MavenServerService {
     private static final Logger LOG = LoggerFactory.getLogger(MavenServerService.class);
 
-    private final MavenWrapperManager wrapperManager;
-    private final ProjectRegistry     projectRegistry;
-    private final MavenProjectManager mavenProjectManager;
-    private final ProjectManager      cheProjectManager;
+    private final MavenWrapperManager      wrapperManager;
+    private final ProjectRegistry          projectRegistry;
+    private final MavenProjectManager      mavenProjectManager;
+    private final MavenWorkspace           mavenWorkspace;
+    private final EclipseWorkspaceProvider eclipseWorkspaceProvider;
+    private final ProjectManager           cheProjectManager;
 
     @PathParam("wsId")
     private String workspaceId;
@@ -84,12 +91,16 @@ public class MavenServerService {
     public MavenServerService(MavenWrapperManager wrapperManager,
                               ProjectRegistry projectRegistry,
                               ProjectManager projectManager,
-                              MavenProjectManager mavenProjectManager) {
+                              MavenProjectManager mavenProjectManager,
+                              MavenWorkspace mavenWorkspace,
+                              EclipseWorkspaceProvider eclipseWorkspaceProvider) {
 
         cheProjectManager = projectManager;
         this.wrapperManager = wrapperManager;
         this.projectRegistry = projectRegistry;
         this.mavenProjectManager = mavenProjectManager;
+        this.mavenWorkspace = mavenWorkspace;
+        this.eclipseWorkspaceProvider = eclipseWorkspaceProvider;
     }
 
     /**
@@ -127,7 +138,7 @@ public class MavenServerService {
             }
             return mavenServer.getEffectivePom(pomFile.getVirtualFile().toIoFile(), Collections.emptyList(), Collections.emptyList());
         } finally {
-           wrapperManager.release(mavenServer);
+            wrapperManager.release(mavenServer);
         }
     }
 
@@ -136,6 +147,15 @@ public class MavenServerService {
     @Produces("text/plain")
     public String downloadSource(@QueryParam("projectpath") String projectPath, @QueryParam("fqn") String fqn) {
         return Boolean.toString(classpathManager.downloadSources(projectPath, fqn));
+    }
+
+    @PUT
+    @Path("reimport/dependencies")
+    public void reimportDependencies(@QueryParam("projectPath") List<String> paths) throws ServerException {
+        IWorkspace workspace = eclipseWorkspaceProvider.get();
+        List<IProject> projectsList =
+                paths.stream().map(projectPath -> workspace.getRoot().getProject(projectPath)).collect(Collectors.toList());
+        mavenWorkspace.update(projectsList);
     }
 
     @GET

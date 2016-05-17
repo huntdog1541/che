@@ -23,6 +23,7 @@ import org.eclipse.che.ide.api.filetypes.FileType;
 import org.eclipse.che.ide.api.filetypes.FileTypeRegistry;
 import org.eclipse.che.ide.api.project.type.wizard.PreSelectedProjectTypeManager;
 import org.eclipse.che.plugin.maven.client.actions.GetEffectivePomAction;
+import org.eclipse.che.plugin.maven.client.actions.ReimportMavenDependenciesAction;
 import org.eclipse.che.plugin.maven.client.comunnication.MavenMessagesHandler;
 import org.eclipse.che.plugin.maven.client.comunnication.progressor.background.DependencyResolverAction;
 import org.eclipse.che.plugin.maven.client.editor.ClassFileSourcesDownloader;
@@ -65,9 +66,11 @@ public class MavenExtension {
     @Inject
     private void prepareActions(ActionManager actionManager,
                                 DependencyResolverAction dependencyResolverAction,
-                                GetEffectivePomAction getEffectivePomAction) {
+                                GetEffectivePomAction getEffectivePomAction,
+                                ReimportMavenDependenciesAction reimportMavenDependenciesAction) {
         // register actions
         actionManager.registerAction("getEffectivePom", getEffectivePomAction);
+        actionManager.registerAction("reimportMavenDependenciesAction", reimportMavenDependenciesAction);
 
         // add actions in main menu
         DefaultActionGroup assistantGroup = (DefaultActionGroup)actionManager.getAction(IdeActions.GROUP_ASSISTANT);
@@ -75,6 +78,7 @@ public class MavenExtension {
 
         // add actions in context menu
         DefaultActionGroup buildContextMenuGroup = (DefaultActionGroup)actionManager.getAction(GROUP_BUILD_CONTEXT_MENU);
+        buildContextMenuGroup.add(reimportMavenDependenciesAction, Constraints.LAST);
         buildContextMenuGroup.addSeparator();
 
         // add resolver widget on right part of bottom panel

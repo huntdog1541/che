@@ -105,8 +105,9 @@ public class ActionManagerImpl implements ActionManager {
         DefaultActionGroup mainContextMenuGroup = new DefaultActionGroup(IdeActions.GROUP_MAIN_CONTEXT_MENU, false, this);
         registerAction(IdeActions.GROUP_MAIN_CONTEXT_MENU, mainContextMenuGroup);
 
-        DefaultActionGroup buildContextMenuGroup = new DefaultActionGroup(IdeActions.GROUP_BUILD_CONTEXT_MENU, false, this);
+        DefaultActionGroup buildContextMenuGroup = new DefaultActionGroup("Maven", true, this);
         registerAction(IdeActions.GROUP_BUILD_CONTEXT_MENU, buildContextMenuGroup);
+        mainContextMenuGroup.add(buildContextMenuGroup);
 
         DefaultActionGroup runContextMenuGroup = new DefaultActionGroup(IdeActions.GROUP_RUN_CONTEXT_MENU, false, this);
         registerAction(IdeActions.GROUP_RUN_CONTEXT_MENU, runContextMenuGroup);
