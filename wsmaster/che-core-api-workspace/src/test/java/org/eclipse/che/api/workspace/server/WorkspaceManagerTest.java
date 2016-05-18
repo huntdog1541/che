@@ -188,7 +188,7 @@ public class WorkspaceManagerTest {
         final WorkspaceImpl workspace = workspaceManager.createWorkspace(createConfig(), "user123", "account");
         when(workspaceDao.get(workspace.getConfig().getName(), workspace.getNamespace())).thenReturn(workspace);
         when(runtimes.get(any())).thenThrow(new NotFoundException(""));
-        when(userManager.getByName(anyString())).thenReturn(new org.eclipse.che.api.user.server.dao.User()
+        when(userManager.getByName(anyString())).thenReturn(new org.eclipse.che.api.user.server.spi.User()
                                                                     .withId(workspace.getNamespace()));
 
         final WorkspaceImpl result = workspaceManager.getWorkspace(workspace.getNamespace() + ":" + workspace.getConfig().getName());

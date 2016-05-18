@@ -20,12 +20,6 @@ import org.eclipse.che.api.core.rest.annotations.GenerateLink;
 import org.eclipse.che.api.core.rest.annotations.Required;
 import org.eclipse.che.api.core.rest.shared.dto.Link;
 import org.eclipse.che.api.core.util.LinksHelper;
-import org.eclipse.che.api.user.server.dao.PreferenceDao;
-import org.eclipse.che.api.user.server.dao.Profile;
-import org.eclipse.che.api.user.server.dao.User;
-import org.eclipse.che.api.user.server.dao.UserDao;
-import org.eclipse.che.api.user.server.dao.ProfileDao;
-import org.eclipse.che.api.user.shared.dto.ProfileDescriptor;
 import org.eclipse.che.commons.env.EnvironmentContext;
 import org.eclipse.che.dto.server.DtoFactory;
 
@@ -49,7 +43,6 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriBuilder;
@@ -64,7 +57,6 @@ import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_CURRENT_
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_CURRENT_USER_PROFILE;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_USER_PROFILE_BY_ID;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_REMOVE_ATTRIBUTES;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_REMOVE_PREFERENCES;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_PREFERENCES;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_USER_PROFILE_BY_ID;
 import static com.google.common.base.Strings.nullToEmpty;
@@ -81,10 +73,10 @@ import java.util.concurrent.locks.Lock;
 @Api(value = "/profile",
      description = "User profile manager")
 @Path("/profile")
-public class UserProfileService extends Service {
+public class ProfileService extends Service {
 
-    private static final Logger LOG = LoggerFactory.getLogger(UserProfileService.class);
-    
+    private static final Logger LOG = LoggerFactory.getLogger(ProfileService.class);
+
     // Assuming 1000 concurrent users at most trying to update their preferences (if more they will wait for another user to finish).
     // Using the lazy weak version of Striped so the locks will be created on demand and not eagerly, and garbage collected when not needed anymore.
     private static final Striped<Lock> preferencesUpdateLocksByUser = Striped.lazyWeakLock(1000);
@@ -94,7 +86,7 @@ public class UserProfileService extends Service {
     private final PreferenceDao preferenceDao;
 
     @Inject
-    public UserProfileService(ProfileDao profileDao, PreferenceDao preferenceDao, UserDao userDao) {
+    public ProfileService(ProfileDao profileDao, PreferenceDao preferenceDao, UserDao userDao) {
         this.profileDao = profileDao;
         this.userDao = userDao;
         this.preferenceDao = preferenceDao;
@@ -128,28 +120,6 @@ public class UserProfileService extends Service {
         return toDescriptor(profile, context);
     }
 
-    /**
-     * Returns preferences for current user
-     */
-    @ApiOperation(value = "Get user preferences",
-            notes = "Get user preferences, like SSH keys, recently opened project and files. It is possible " +
-                    "to use a filter, e.g. CodenvyAppState or ssh.key.public.github.com to get the last opened project " +
-                    "or a public part of GitHub SSH key (if any)",
-            response = ProfileDescriptor.class)
-    @ApiResponses(value = {
-            @ApiResponse(code = 200, message = "OK"),
-            @ApiResponse(code = 500, message = "Internal Server Error")})
-    @GET
-    @Path("/prefs")
-    @Produces(APPLICATION_JSON)
-    @RolesAllowed({"user", "temp_user"})
-    public Map<String, String> getPreferences(@ApiParam(value = "Filer")
-                                                  @QueryParam("filter") String filter) throws ServerException {
-        if (filter != null) {
-            return preferenceDao.getPreferences(currentUser().getId(), filter);
-        }
-        return preferenceDao.getPreferences(currentUser().getId());
-    }
 
     /**
      * Updates attributes of current user profile.
@@ -251,46 +221,6 @@ public class UserProfileService extends Service {
     }
 
     /**
-     * <p>Updates preferences of current user profile.</p>
-     *
-     * @param update
-     *         update preferences
-     * @return descriptor of updated profile
-     * @throws ServerException
-     *         when some error occurred while retrieving/updating profile
-     * @throws ConflictException
-     *         when update is {@code null} or <i>empty</i>
-     * @see ProfileDescriptor
-     * @see #updateCurrent(Map, SecurityContext)
-     */
-    @POST
-    @Path("/prefs")
-    @RolesAllowed({"user", "temp_user"})
-    @GenerateLink(rel = LINK_REL_UPDATE_PREFERENCES)
-    @Consumes(APPLICATION_JSON)
-    @Produces(APPLICATION_JSON)
-    public Map<String, String> updatePreferences(@Required Map<String, String> update) throws NotFoundException,
-                                                                                              ServerException,
-                                                                                              ConflictException {
-        if (update == null || update.isEmpty()) {
-            throw new ConflictException("Preferences to update required");
-        }
-        
-        String userId = currentUser().getId();
-        // Keep the lock in a variable so it isn't garbage collected while in use
-        Lock lock = preferencesUpdateLocksByUser.get(userId);
-        lock.lock();
-        try {
-            final Map<String, String> preferences = preferenceDao.getPreferences(userId);
-            preferences.putAll(update);
-            preferenceDao.setPreferences(currentUser().getId(), preferences);
-            return preferences;
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    /**
      * Removes attributes with given names from current user profile.
      * If names are {@code null} - all attributes will be removed
      *
@@ -331,51 +261,6 @@ public class UserProfileService extends Service {
     }
 
     /**
-     * Removes preferences with given name from current user profile.
-     * If names are {@code null} - all preferences will be removed
-     *
-     * @param names
-     *         preferences names to remove
-     * @throws ServerException
-     *         when some error occurred while retrieving/updating profile
-     * @see #removeAttributes(List, SecurityContext)
-     */
-    @ApiOperation(value = "Remove profile references of a current user",
-                  notes = "Remove profile references of a current user",
-                  position = 7)
-    @ApiResponses(value = {
-            @ApiResponse(code = 204, message = "OK"),
-            @ApiResponse(code = 404, message = "Not Found"),
-            @ApiResponse(code = 409, message = "Preferences names required"),
-            @ApiResponse(code = 500, message = "Internal Server Error")})
-    @DELETE
-    @Path("/prefs")
-    @GenerateLink(rel = LINK_REL_REMOVE_PREFERENCES)
-    @RolesAllowed({"user", "temp_user"})
-    @Consumes(APPLICATION_JSON)
-    public void removePreferences(@ApiParam(value = "Preferences to remove", required = true)
-                                  @Required
-                                  List<String> names) throws ServerException, NotFoundException {
-        String userId = currentUser().getId();
-        if (names == null) {
-            preferenceDao.remove(userId);
-        } else {
-            // Keep the lock in a variable so it isn't garbage collected while in use
-            Lock lock = preferencesUpdateLocksByUser.get(userId);
-            lock.lock();
-            try {
-                final Map<String, String> preferences = preferenceDao.getPreferences(userId);
-                for (String name : names) {
-                    preferences.remove(name);
-                }
-                preferenceDao.setPreferences(userId, preferences);
-            } finally {
-                lock.unlock();
-            }
-        }
-    }
-
-    /**
      * Converts {@link Profile} to {@link ProfileDescriptor}
      */
     /* package-private used in tests*/ProfileDescriptor toDescriptor(Profile profile, SecurityContext context) {
@@ -408,7 +293,7 @@ public class UserProfileService extends Service {
                                              LINK_REL_UPDATE_CURRENT_USER_PROFILE));
             links.add(LinksHelper.createLink(HttpMethod.POST,
                                              uriBuilder.clone()
-                                                       .path(getClass(), "updatePreferences")
+                                                       .path(getClass(), "update")
                                                        .build()
                                                        .toString(),
                                              APPLICATION_JSON,

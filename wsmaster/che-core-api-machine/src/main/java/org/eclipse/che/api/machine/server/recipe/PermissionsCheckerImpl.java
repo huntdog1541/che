@@ -14,8 +14,8 @@ import org.eclipse.che.api.core.ServerException;
 import org.eclipse.che.api.machine.shared.Group;
 import org.eclipse.che.api.machine.shared.Permissible;
 import org.eclipse.che.api.machine.shared.Permissions;
-//import org.eclipse.che.api.workspace.server.dao.Member;
-//import org.eclipse.che.api.workspace.server.dao.MemberDao;
+//import org.eclipse.che.api.workspace.server.spi.Member;
+//import org.eclipse.che.api.workspace.server.spi.MemberDao;
 
 import javax.inject.Singleton;
 import java.util.List;

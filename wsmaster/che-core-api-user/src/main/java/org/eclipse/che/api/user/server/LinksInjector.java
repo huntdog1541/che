@@ -13,7 +13,7 @@ package org.eclipse.che.api.user.server;
 import org.eclipse.che.api.core.rest.ServiceContext;
 import org.eclipse.che.api.core.rest.shared.dto.Link;
 import org.eclipse.che.api.core.util.LinksHelper;
-import org.eclipse.che.api.user.shared.dto.UserDescriptor;
+import org.eclipse.che.api.user.shared.dto.UserDto;
 import org.eclipse.che.commons.env.EnvironmentContext;
 import org.eclipse.che.commons.user.User;
 
@@ -39,15 +39,15 @@ import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_PASSWORD
  */
 public final class LinksInjector {
 
-    public static UserDescriptor injectLinks(UserDescriptor userDescriptor, ServiceContext serviceContext) {
+    public static UserDto injectLinks(UserDto userDescriptor, ServiceContext serviceContext) {
         final User currentUser = EnvironmentContext.getCurrent().getUser();
         final UriBuilder uriBuilder = serviceContext.getBaseUriBuilder();
 
         final List<Link> links = new LinkedList<>();
         if (currentUser.isMemberOf("user")) {
             links.add(LinksHelper.createLink(HttpMethod.GET,
-                                             uriBuilder.clone().path(UserProfileService.class)
-                                                       .path(UserProfileService.class, "getCurrent")
+                                             uriBuilder.clone().path(ProfileService.class)
+                                                       .path(ProfileService.class, "getCurrent")
                                                        .build()
                                                        .toString(),
                                              null,
@@ -80,8 +80,8 @@ public final class LinksInjector {
                                              APPLICATION_JSON,
                                              LINK_REL_GET_USER_BY_ID));
             links.add(LinksHelper.createLink(HttpMethod.GET,
-                                             uriBuilder.clone().path(UserProfileService.class)
-                                                       .path(UserProfileService.class, "getById")
+                                             uriBuilder.clone().path(ProfileService.class)
+                                                       .path(ProfileService.class, "getById")
                                                        .build(userDescriptor.getId())
                                                        .toString(),
                                              null,

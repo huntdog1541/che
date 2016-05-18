@@ -12,14 +12,13 @@ package org.eclipse.che.api.user.server;
 
 import sun.security.acl.PrincipalImpl;
 
+import org.eclipse.che.api.core.model.user.User;
 import org.eclipse.che.api.core.rest.ApiExceptionMapper;
 import org.eclipse.che.api.core.rest.shared.dto.Link;
-import org.eclipse.che.api.user.server.dao.PreferenceDao;
-import org.eclipse.che.api.user.server.dao.Profile;
-import org.eclipse.che.api.user.server.dao.User;
-import org.eclipse.che.api.user.server.dao.UserDao;
-import org.eclipse.che.api.user.server.dao.ProfileDao;
-import org.eclipse.che.api.user.shared.dto.ProfileDescriptor;
+import org.eclipse.che.api.user.server.spi.PreferenceDao;
+import org.eclipse.che.api.user.server.spi.UserDao;
+import org.eclipse.che.api.user.server.spi.ProfileDao;
+import org.eclipse.che.api.user.shared.dto.ProfileDto;
 import org.eclipse.che.commons.json.JsonHelper;
 import org.everrest.core.impl.ApplicationContextImpl;
 import org.everrest.core.impl.ApplicationProviderBinder;
@@ -73,7 +72,7 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Tests for {@link UserProfileService}
+ * Tests for {@link ProfileService}
  *
  * @author Max Shaposhnik
  * @author Eugene Voevodin
@@ -99,12 +98,12 @@ public class UserProfileServiceTest {
     @Mock
     private SecurityContext    securityContext;
     private ResourceLauncher   launcher;
-    private UserProfileService service;
+    private ProfileService     service;
 
     @BeforeMethod
     public void setUp() throws Exception {
         final ResourceBinderImpl resources = new ResourceBinderImpl();
-        resources.addResource(UserProfileService.class, null);
+        resources.addResource(ProfileService.class, null);
         final DependencySupplierImpl dependencies = new DependencySupplierImpl();
         dependencies.addComponent(UserDao.class, userDao);
         dependencies.addComponent(ProfileDao.class, profileDao);
@@ -122,8 +121,8 @@ public class UserProfileServiceTest {
                                                                   new EverrestConfiguration(),
                                                                   null);
         launcher = new ResourceLauncher(processor);
-        service = (UserProfileService)resources.getMatchedResource("/profile", new ArrayList<String>())
-                                               .getInstance(ApplicationContextImpl.getCurrent());
+        service = (ProfileService)resources.getMatchedResource("/profile", new ArrayList<String>())
+                                           .getInstance(ApplicationContextImpl.getCurrent());
         //setup testUser
         final String id = "user123abc456def";
         final String email = "user@testuser.com";
@@ -175,7 +174,7 @@ public class UserProfileServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH, null);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        final ProfileDescriptor descriptor = (ProfileDescriptor)response.getEntity();
+        final ProfileDto descriptor = (ProfileDto)response.getEntity();
         assertEquals(descriptor.getId(), current.getId());
         assertEquals(descriptor.getUserId(), current.getUserId());
         assertEquals(descriptor.getAttributes().get("email"), testUser.getEmail());
@@ -291,7 +290,7 @@ public class UserProfileServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH + "/" + profile.getId(), null);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        final ProfileDescriptor descriptor = (ProfileDescriptor)response.getEntity();
+        final ProfileDto descriptor = (ProfileDto)response.getEntity();
         assertEquals(descriptor.getUserId(), profile.getId());
         assertEquals(descriptor.getId(), profile.getId());
         assertEquals(descriptor.getAttributes().get("email"), testUser.getEmail());
@@ -310,7 +309,7 @@ public class UserProfileServiceTest {
 
         assertEquals(response.getStatus(), OK.getStatusCode());
         verify(profileDao, times(1)).update(profile);
-        assertEquals(((ProfileDescriptor)response.getEntity()).getAttributes(), attributes);
+        assertEquals(((ProfileDto)response.getEntity()).getAttributes(), attributes);
     }
 
     @Test
@@ -354,7 +353,7 @@ public class UserProfileServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.POST, SERVICE_PATH + "/" + profile.getId(), attributes);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        assertEquals(((ProfileDescriptor)response.getEntity()).getAttributes(), attributes);
+        assertEquals(((ProfileDto)response.getEntity()).getAttributes(), attributes);
         verify(profileDao, times(1)).update(profile);
     }
 

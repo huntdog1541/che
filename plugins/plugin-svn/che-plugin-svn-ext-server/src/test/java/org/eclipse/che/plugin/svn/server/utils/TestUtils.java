@@ -15,8 +15,8 @@ import com.google.common.io.Files;
 
 import org.eclipse.che.api.core.util.LineConsumer;
 import org.eclipse.che.api.core.util.LineConsumerFactory;
-import org.eclipse.che.api.user.server.dao.Profile;
-import org.eclipse.che.api.user.server.dao.ProfileDao;
+import org.eclipse.che.api.user.server.spi.Profile;
+import org.eclipse.che.api.user.server.spi.ProfileDao;
 import org.eclipse.che.api.vfs.VirtualFileSystem;
 import org.eclipse.che.api.vfs.VirtualFileSystemProvider;
 import org.eclipse.che.api.vfs.impl.file.LocalVirtualFileSystemProvider;

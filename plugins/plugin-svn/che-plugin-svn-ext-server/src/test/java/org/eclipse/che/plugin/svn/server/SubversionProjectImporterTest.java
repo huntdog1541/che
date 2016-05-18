@@ -20,7 +20,7 @@ import org.eclipse.che.api.project.server.FolderEntry;
 import org.eclipse.che.api.project.server.importer.ProjectImporter;
 import org.eclipse.che.api.project.server.type.ProjectTypeDef;
 import org.eclipse.che.api.project.server.type.ValueProviderFactory;
-import org.eclipse.che.api.user.server.dao.ProfileDao;
+import org.eclipse.che.api.user.server.spi.ProfileDao;
 import org.eclipse.che.api.vfs.VirtualFile;
 import org.eclipse.che.api.vfs.VirtualFileSystem;
 import org.eclipse.che.commons.lang.NameGenerator;

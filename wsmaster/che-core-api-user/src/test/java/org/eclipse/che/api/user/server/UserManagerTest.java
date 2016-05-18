@@ -10,11 +10,11 @@
  *******************************************************************************/
 package org.eclipse.che.api.user.server;
 
-import org.eclipse.che.api.user.server.dao.PreferenceDao;
-import org.eclipse.che.api.user.server.dao.Profile;
-import org.eclipse.che.api.user.server.dao.User;
-import org.eclipse.che.api.user.server.dao.UserDao;
-import org.eclipse.che.api.user.server.dao.ProfileDao;
+import org.eclipse.che.api.core.model.user.Profile;
+import org.eclipse.che.api.core.model.user.User;
+import org.eclipse.che.api.user.server.spi.UserDao;
+import org.eclipse.che.api.user.server.model.impl.UserImpl;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.testng.MockitoTestNGListener;
@@ -24,42 +24,42 @@ import org.testng.annotations.Test;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyMapOf;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.testng.Assert.assertNotNull;
 
 /**
  * Tests for {@link UserManager}
  *
  * @author Max Shaposhnik (mshaposhnik@codenvy.com)
  */
-
-@Listeners(value = {MockitoTestNGListener.class})
+@Listeners(MockitoTestNGListener.class)
 public class UserManagerTest {
 
     @Mock
-    UserDao       userDao;
+    private UserDao            userDao;
     @Mock
-    ProfileDao    profileDao;
+    private ProfileManager     profileManager;
     @Mock
-    PreferenceDao preferenceDao;
-
+    private PreferencesManager preferencesManager;
     @InjectMocks
-    UserManager manager;
+    private UserManager        manager;
 
     @Test
     public void shouldCreateProfileAndPreferencesOnUserCreation() throws Exception {
-        final User user = new User().withEmail("test@email.com").withName("testName");
+        final UserImpl user = new UserImpl(null, "test@email.com", "testName", null, null);
         manager.create(user, false);
 
-        verify(profileDao).create(any(Profile.class));
-        verify(preferenceDao).setPreferences(anyString(), anyMapOf(String.class, String.class));
+        verify(profileManager).create(any(Profile.class));
+        verify(preferencesManager).save(anyString(), anyMapOf(String.class, String.class));
     }
 
     @Test
     public void shouldGeneratedPasswordWhenCreatingUserAndItIsMissing() throws Exception {
-        final User user = new User().withEmail("test@email.com").withName("testName");
+        final User user = new UserImpl(null, "test@email.com", "testName", null, null);
         manager.create(user, false);
 
-        verify(userDao).create(eq(user.withPassword("<none>")));
+        final ArgumentCaptor<UserImpl> userCaptor = new ArgumentCaptor<>();
+        verify(userDao).create(userCaptor.capture());
+        assertNotNull(userCaptor.getValue().getPassword());
     }
 }

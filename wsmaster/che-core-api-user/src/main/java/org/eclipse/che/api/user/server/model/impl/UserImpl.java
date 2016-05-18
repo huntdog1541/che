@@ -8,7 +8,7 @@
  * Contributors:
  *   Codenvy, S.A. - initial API and implementation
  *******************************************************************************/
-package org.eclipse.che.api.user.server.dao;
+package org.eclipse.che.api.user.server.model.impl;
 
 import org.eclipse.che.api.core.model.user.User;
 

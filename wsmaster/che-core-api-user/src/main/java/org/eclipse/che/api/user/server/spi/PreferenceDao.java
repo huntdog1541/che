@@ -8,9 +8,8 @@
  * Contributors:
  *   Codenvy, S.A. - initial API and implementation
  *******************************************************************************/
-package org.eclipse.che.api.user.server.dao;
+package org.eclipse.che.api.user.server.spi;
 
-import org.eclipse.che.api.core.NotFoundException;
 import org.eclipse.che.api.core.ServerException;
 
 import java.util.Map;
@@ -41,9 +40,9 @@ public interface PreferenceDao {
      *
      * <p>Note that this method must always return upgradable map, thus it may be used as:
      * <pre>{@code
-     *      Map<String, String> prefs = dao.getPreferences("user123");
+     *      Map<String, String> prefs = spi.getPreferences("user123");
      *      prefs.put("key", "secret");
-     *      dao.setPreferences("user123", prefs);
+     *      spi.setPreferences("user123", prefs);
      * }</pre>
      *
      * @param userId
@@ -61,7 +60,7 @@ public interface PreferenceDao {
      *
      * <p>Note that this method must always return upgradable map, thus it may be used as:
      * <pre>{@code
-     *      Map<String, String> prefs = dao.getPreferences("user123", ".*key.*");
+     *      Map<String, String> prefs = spi.getPreferences("user123", ".*key.*");
      *      prefs.put("new-key", "secret");
      *      prefs.setPreferences("user123", prefs);
      * }</pre>

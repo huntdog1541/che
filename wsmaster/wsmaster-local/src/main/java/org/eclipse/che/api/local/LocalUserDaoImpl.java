@@ -19,8 +19,8 @@ import org.eclipse.che.api.core.ServerException;
 import org.eclipse.che.api.core.UnauthorizedException;
 import org.eclipse.che.api.local.storage.LocalStorage;
 import org.eclipse.che.api.local.storage.LocalStorageFactory;
-import org.eclipse.che.api.user.server.dao.User;
-import org.eclipse.che.api.user.server.dao.UserDao;
+import org.eclipse.che.api.user.server.spi.User;
+import org.eclipse.che.api.user.server.spi.UserDao;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;

@@ -13,9 +13,8 @@ package org.eclipse.che.api.user.server;
 import org.eclipse.che.api.core.NotFoundException;
 import org.eclipse.che.api.core.ServerException;
 import org.eclipse.che.api.core.rest.ApiExceptionMapper;
-import org.eclipse.che.api.user.server.dao.User;
-import org.eclipse.che.api.user.shared.dto.UserDescriptor;
-import org.eclipse.che.api.user.shared.dto.UserInRoleDescriptor;
+import org.eclipse.che.api.user.shared.dto.UserDto;
+import org.eclipse.che.api.user.shared.dto.UserInRoleDto;
 import org.eclipse.che.commons.json.JsonHelper;
 import org.eclipse.che.dto.server.DtoFactory;
 import org.everrest.core.impl.ApplicationContextImpl;
@@ -162,7 +161,7 @@ public class UserServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.POST, SERVICE_PATH + "/create?token=" + token, null);
 
         assertEquals(response.getStatus(), CREATED.getStatusCode());
-        final UserDescriptor user = (UserDescriptor)response.getEntity();
+        final UserDto user = (UserDto)response.getEntity();
         assertEquals(user.getEmail(), userEmail);
         assertEquals(user.getPassword(), "<none>");
         verify(userManager).create(any(User.class), eq(false));
@@ -173,33 +172,33 @@ public class UserServiceTest {
     public void shouldBeAbleToCreateNewUserWithEmail() throws Exception {
         final String name = "name";
         final String email = "test_user@email.com";
-        final UserDescriptor newUser = DtoFactory.getInstance()
-                                                 .createDto(UserDescriptor.class)
-                                                 .withName(name)
-                                                 .withEmail(email);
+        final UserDto newUser = DtoFactory.getInstance()
+                                          .createDto(UserDto.class)
+                                          .withName(name)
+                                          .withEmail(email);
         when(securityContext.isUserInRole("system/admin")).thenReturn(true);
 
         final ContainerResponse response = makeRequest(HttpMethod.POST, SERVICE_PATH + "/create", newUser);
 
         assertEquals(response.getStatus(), CREATED.getStatusCode());
-        final UserDescriptor descriptor = (UserDescriptor)response.getEntity();
+        final UserDto descriptor = (UserDto)response.getEntity();
         assertEquals(descriptor.getName(), name);
         assertEquals(descriptor.getEmail(), email);
     }
 
     @Test
     public void shouldBeAbleToCreateNewUserForSystemAdmin() throws Exception {
-        final UserDescriptor newUser = DtoFactory.getInstance()
-                                                 .createDto(UserDescriptor.class)
-                                                 .withName("test")
-                                                 .withPassword("password123")
-                                                 .withEmail("test@mail.com");
+        final UserDto newUser = DtoFactory.getInstance()
+                                          .createDto(UserDto.class)
+                                          .withName("test")
+                                          .withPassword("password123")
+                                          .withEmail("test@mail.com");
         when(securityContext.isUserInRole("system/admin")).thenReturn(true);
 
         final ContainerResponse response = makeRequest(HttpMethod.POST, SERVICE_PATH + "/create", newUser);
 
         assertEquals(response.getStatus(), CREATED.getStatusCode());
-        final UserDescriptor descriptor = (UserDescriptor)response.getEntity();
+        final UserDto descriptor = (UserDto)response.getEntity();
         assertEquals(descriptor.getName(), newUser.getName());
         assertEquals(descriptor.getPassword(), "<none>");
         verify(userManager).create(any(User.class), eq(false));
@@ -231,15 +230,15 @@ public class UserServiceTest {
         uriField.setAccessible(true);
         uriField.set(userService, false);
 
-        final UserDescriptor newUser = DtoFactory.getInstance()
-                                                 .createDto(UserDescriptor.class)
-                                                 .withName("test")
-                                                 .withEmail("test@mail.com");
+        final UserDto newUser = DtoFactory.getInstance()
+                                          .createDto(UserDto.class)
+                                          .withName("test")
+                                          .withEmail("test@mail.com");
 
         final ContainerResponse response = makeRequest(HttpMethod.POST, SERVICE_PATH + "/create", newUser);
 
         assertEquals(response.getStatus(), CREATED.getStatusCode());
-        final UserDescriptor user = (UserDescriptor)response.getEntity();
+        final UserDto user = (UserDto)response.getEntity();
         assertEquals(user.getName(), newUser.getName());
         assertEquals(user.getPassword(), "<none>");
         verify(userManager).create(any(User.class), eq(false));
@@ -247,10 +246,10 @@ public class UserServiceTest {
 
     @Test
     public void shouldThrowForbiddenExceptionWhenCreatingUserWithInvalidPassword() throws Exception {
-        final UserDescriptor newUser = DtoFactory.getInstance()
-                                                 .createDto(UserDescriptor.class)
-                                                 .withName("test")
-                                                 .withPassword("password");
+        final UserDto newUser = DtoFactory.getInstance()
+                                          .createDto(UserDto.class)
+                                          .withName("test")
+                                          .withPassword("password");
         when(securityContext.isUserInRole("system/admin")).thenReturn(true);
 
         final ContainerResponse response = makeRequest(HttpMethod.POST, SERVICE_PATH + "/create", newUser);
@@ -280,7 +279,7 @@ public class UserServiceTest {
 
     @Test
     public void shouldThrowForbiddenExceptionWhenCreatingUserBasedOnEntityWhichContainsNullEmail() throws Exception {
-        final UserDescriptor newUser = DtoFactory.getInstance().createDto(UserDescriptor.class);
+        final UserDto newUser = DtoFactory.getInstance().createDto(UserDto.class);
         when(securityContext.isUserInRole("system/admin")).thenReturn(true);
 
         final ContainerResponse response = makeRequest(HttpMethod.POST, SERVICE_PATH + "/create", newUser);
@@ -296,7 +295,7 @@ public class UserServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH, null);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        final UserDescriptor descriptor = (UserDescriptor)response.getEntity();
+        final UserDto descriptor = (UserDto)response.getEntity();
         assertEquals(descriptor.getId(), user.getId());
         assertEquals(descriptor.getEmail(), user.getEmail());
         assertEquals(descriptor.getAliases(), user.getAliases());
@@ -309,7 +308,7 @@ public class UserServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH + "/" + user.getId(), null);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        final UserDescriptor descriptor = (UserDescriptor)response.getEntity();
+        final UserDto descriptor = (UserDto)response.getEntity();
         assertEquals(descriptor.getId(), user.getId());
         assertEquals(descriptor.getEmail(), user.getEmail());
         assertEquals(descriptor.getAliases(), user.getAliases());
@@ -322,7 +321,7 @@ public class UserServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH + "?alias=" + user.getEmail(), null);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        final UserDescriptor descriptor = (UserDescriptor)response.getEntity();
+        final UserDto descriptor = (UserDto)response.getEntity();
         assertEquals(descriptor.getId(), user.getId());
         assertEquals(descriptor.getEmail(), user.getEmail());
         assertEquals(descriptor.getAliases(), user.getAliases());
@@ -425,7 +424,7 @@ public class UserServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH + "/inrole?role=user", null);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        final UserInRoleDescriptor userInRoleDescriptor = (UserInRoleDescriptor)response.getEntity();
+        final UserInRoleDto userInRoleDescriptor = (UserInRoleDto)response.getEntity();
 
         assertNotNull(userInRoleDescriptor);
         assertEquals(userInRoleDescriptor.getIsInRole(), true);
@@ -444,7 +443,7 @@ public class UserServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH + "/inrole?role=user&scope=system", null);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        final UserInRoleDescriptor userInRoleDescriptor = (UserInRoleDescriptor)response.getEntity();
+        final UserInRoleDto userInRoleDescriptor = (UserInRoleDto)response.getEntity();
 
         assertNotNull(userInRoleDescriptor);
         assertEquals(userInRoleDescriptor.getIsInRole(), true);
@@ -464,7 +463,7 @@ public class UserServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH + "/inrole?role=temp_user&scope=system", null);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        final UserInRoleDescriptor userInRoleDescriptor = (UserInRoleDescriptor)response.getEntity();
+        final UserInRoleDto userInRoleDescriptor = (UserInRoleDto)response.getEntity();
 
         assertNotNull(userInRoleDescriptor);
         assertEquals(userInRoleDescriptor.getIsInRole(), true);
@@ -484,7 +483,7 @@ public class UserServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH + "/inrole?role=admin", null);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        final UserInRoleDescriptor userInRoleDescriptor = (UserInRoleDescriptor)response.getEntity();
+        final UserInRoleDto userInRoleDescriptor = (UserInRoleDto)response.getEntity();
 
         assertNotNull(userInRoleDescriptor);
         assertEquals(userInRoleDescriptor.getIsInRole(), true);
@@ -504,7 +503,7 @@ public class UserServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH + "/inrole?role=admin", null);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        final UserInRoleDescriptor userInRoleDescriptor = (UserInRoleDescriptor)response.getEntity();
+        final UserInRoleDto userInRoleDescriptor = (UserInRoleDto)response.getEntity();
 
         assertNotNull(userInRoleDescriptor);
         assertEquals(userInRoleDescriptor.getIsInRole(), false);
@@ -525,7 +524,7 @@ public class UserServiceTest {
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH + "/inrole?role=manager&scope=system", null);
 
         assertEquals(response.getStatus(), OK.getStatusCode());
-        final UserInRoleDescriptor userInRoleDescriptor = (UserInRoleDescriptor)response.getEntity();
+        final UserInRoleDto userInRoleDescriptor = (UserInRoleDto)response.getEntity();
 
         assertNotNull(userInRoleDescriptor);
         assertEquals(userInRoleDescriptor.getIsInRole(), true);
@@ -535,10 +534,10 @@ public class UserServiceTest {
 
     @Test
     public void shouldNotBeAbleToCreateUserWithoutEmailBySystemAdmin() throws Exception {
-        final UserDescriptor newUser = DtoFactory.getInstance()
-                                                 .createDto(UserDescriptor.class)
-                                                 .withName("user")
-                                                 .withPassword("password");
+        final UserDto newUser = DtoFactory.getInstance()
+                                          .createDto(UserDto.class)
+                                          .withName("user")
+                                          .withPassword("password");
         when(securityContext.isUserInRole("system/admin")).thenReturn(true);
 
         final ContainerResponse response = makeRequest(HttpMethod.POST, SERVICE_PATH + "/create", newUser);

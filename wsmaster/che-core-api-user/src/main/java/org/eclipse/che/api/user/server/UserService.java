@@ -10,7 +10,6 @@
  *******************************************************************************/
 package org.eclipse.che.api.user.server;
 
-
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -27,13 +26,14 @@ import org.eclipse.che.api.core.ForbiddenException;
 import org.eclipse.che.api.core.NotFoundException;
 import org.eclipse.che.api.core.ServerException;
 import org.eclipse.che.api.core.UnauthorizedException;
+import org.eclipse.che.api.core.model.user.User;
 import org.eclipse.che.api.core.rest.Service;
 import org.eclipse.che.api.core.rest.annotations.Description;
 import org.eclipse.che.api.core.rest.annotations.GenerateLink;
 import org.eclipse.che.api.core.rest.annotations.Required;
-import org.eclipse.che.api.user.server.dao.User;
-import org.eclipse.che.api.user.shared.dto.UserDescriptor;
-import org.eclipse.che.api.user.shared.dto.UserInRoleDescriptor;
+import org.eclipse.che.api.user.server.model.impl.UserImpl;
+import org.eclipse.che.api.user.shared.dto.UserDto;
+import org.eclipse.che.api.user.shared.dto.UserInRoleDto;
 import org.eclipse.che.commons.env.EnvironmentContext;
 
 import javax.annotation.security.RolesAllowed;
@@ -71,9 +71,9 @@ import static org.eclipse.che.api.user.server.LinksInjector.injectLinks;
 import static org.eclipse.che.dto.server.DtoFactory.newDto;
 
 /**
- * Provides REST API for user management
+ * Provides REST API for user management.
  *
- * @author Eugene Voevodin
+ * @author Yevhenii Voevodin
  * @author Anton Korneta
  */
 @Api(value = "/user", description = "User manager")
@@ -95,34 +95,6 @@ public class UserService extends Service {
         this.userSelfCreationAllowed = userSelfCreationAllowed;
     }
 
-    /**
-     * Creates new user and profile.
-     * <p/>
-     * When current user is in 'system/admin' role then {@code userDescriptor} parameter
-     * will be used for user creation, otherwise method uses {@code token} and {@link #tokenValidator}.
-     *
-     * @param token
-     *         authentication token
-     * @param isTemporary
-     *         if it is {@code true} creates temporary user
-     * @return entity of created user
-     * @throws ForbiddenException
-     *         when the user is not the system admin, or self creation is disabled
-     * @throws BadRequestException
-     *         when {@code userDescriptor} is invalid
-     * @throws UnauthorizedException
-     *         when token is null
-     * @throws ConflictException
-     *         when token is not valid
-     * @throws ServerException
-     *         when some error occurred while persisting user or user profile
-     * @see UserDescriptor
-     * @see #getCurrent()
-     * @see #updatePassword(String)
-     * @see #getById(String)
-     * @see #getByAlias(String)
-     * @see #remove(String)
-     */
     @POST
     @Path("/create")
     @Consumes(APPLICATION_JSON)
@@ -133,7 +105,7 @@ public class UserService extends Service {
                           "through a regular registration workflow and by system/admin. In the former case, " +
                           "auth token is sent to user's mailbox, while system/admin can create a user directly " +
                           "with predefined name and password",
-                  response = UserDescriptor.class)
+                  response = UserDto.class)
     @ApiResponses({@ApiResponse(code = 201, message = "Created"),
                    @ApiResponse(code = 400, message = "Missed required parameters, parameters are not valid"),
                    @ApiResponse(code = 401, message = "Missed token parameter"),
@@ -141,7 +113,7 @@ public class UserService extends Service {
                    @ApiResponse(code = 409, message = "Invalid token"),
                    @ApiResponse(code = 500, message = "Internal Server Error")})
     public Response create(@ApiParam(value = "New user")
-                           UserDescriptor userDescriptor,
+                           UserDto userDescriptor,
                            @ApiParam(value = "Authentication token")
                            @QueryParam("token")
                            String token,
@@ -165,44 +137,22 @@ public class UserService extends Service {
         return status(CREATED).entity(injectLinks(toDescriptor(user), getServiceContext())).build();
     }
 
-    /**
-     * Returns {@link UserDescriptor} of current user.
-     *
-     * @return entity of current user.
-     * @throws NotFoundException
-     *         when current user not found
-     * @throws ServerException
-     *         when some error occurred while retrieving current user
-     */
     @GET
     @GenerateLink(rel = LINK_REL_GET_CURRENT_USER)
     @RolesAllowed({"user", "temp_user"})
     @Produces(APPLICATION_JSON)
     @ApiOperation(value = "Get current user",
                   notes = "Get user currently logged in the system",
-                  response = UserDescriptor.class,
+                  response = UserDto.class,
                   position = 2)
     @ApiResponses({@ApiResponse(code = 200, message = "OK"),
                    @ApiResponse(code = 404, message = "Not Found"),
                    @ApiResponse(code = 500, message = "Internal Server Error")})
-    public UserDescriptor getCurrent() throws NotFoundException, ServerException {
-        final User user = userManager.getById(currentUserId());
+    public UserDto getCurrent() throws NotFoundException, ServerException {
+        final User user = userManager.getById(subjectId());
         return injectLinks(toDescriptor(user), getServiceContext());
     }
 
-    /**
-     * Updates current user password.
-     *
-     * @param password
-     *         new user password
-     * @throws NotFoundException
-     *         when current user not found
-     * @throws BadRequestException
-     *         when given password is invalid
-     * @throws ServerException
-     *         when some error occurred while updating profile
-     * @see UserDescriptor
-     */
     @POST
     @Path("/password")
     @GenerateLink(rel = LINK_REL_UPDATE_PASSWORD)
@@ -220,28 +170,13 @@ public class UserService extends Service {
                                                        BadRequestException,
                                                        ServerException,
                                                        ConflictException {
-
         checkPassword(password);
 
-        final User user = userManager.getById(currentUserId());
+        final UserImpl user = userManager.getById(subjectId());
         user.setPassword(password);
         userManager.update(user);
     }
 
-    /**
-     * Returns status <b>200</b> and {@link UserDescriptor} built from user with given {@code id}
-     * or status <b>404</b> when user with given {@code id} was not found.
-     *
-     * @param id
-     *         identifier to search user
-     * @return entity of found user
-     * @throws NotFoundException
-     *         when user with given identifier doesn't exist
-     * @throws ServerException
-     *         when some error occurred while retrieving user
-     * @see UserDescriptor
-     * @see #getByAlias(String)
-     */
     @GET
     @Path("/{id}")
     @GenerateLink(rel = LINK_REL_GET_USER_BY_ID)
@@ -249,33 +184,16 @@ public class UserService extends Service {
     @Produces(APPLICATION_JSON)
     @ApiOperation(value = "Get user by ID",
                   notes = "Get user by its ID in the system. Roles allowed: system/admin, system/manager.",
-                  response = UserDescriptor.class)
+                  response = UserDto.class)
     @ApiResponses({@ApiResponse(code = 200, message = "OK"),
                    @ApiResponse(code = 404, message = "Not Found"),
                    @ApiResponse(code = 500, message = "Internal Server Error")})
-    public UserDescriptor getById(@ApiParam(value = "User ID") @PathParam("id") String id) throws NotFoundException,
-                                                                                                  ServerException {
+    public UserDto getById(@ApiParam(value = "User ID") @PathParam("id") String id) throws NotFoundException,
+                                                                                           ServerException {
         final User user = userManager.getById(id);
         return injectLinks(toDescriptor(user), getServiceContext());
     }
 
-    /**
-     * Returns status <b>200</b> and {@link UserDescriptor} built from user with given {@code alias}
-     * or status <b>404</b> when user with given {@code alias} was not found.
-     *
-     * @param alias
-     *         alias to search user
-     * @return entity of found user
-     * @throws NotFoundException
-     *         when user with given alias doesn't exist
-     * @throws ServerException
-     *         when some error occurred while retrieving user
-     * @throws BadRequestException
-     *         when alias parameter is missing
-     * @see UserDescriptor
-     * @see #getById(String)
-     * @see #remove(String)
-     */
     @GET
     @Path("/find")
     @GenerateLink(rel = LINK_REL_GET_USER_BY_EMAIL)
@@ -283,16 +201,16 @@ public class UserService extends Service {
     @Produces(APPLICATION_JSON)
     @ApiOperation(value = "Get user by alias",
                   notes = "Get user by alias. Roles allowed: system/admin, system/manager.",
-                  response = UserDescriptor.class)
+                  response = UserDto.class)
     @ApiResponses({@ApiResponse(code = 200, message = "OK"),
                    @ApiResponse(code = 400, message = "Missed alias parameter"),
                    @ApiResponse(code = 404, message = "Not Found"),
                    @ApiResponse(code = 500, message = "Internal Server Error")})
-    public UserDescriptor getByAlias(@ApiParam(value = "User alias", required = true)
-                                     @QueryParam("alias")
-                                     @Required String alias) throws NotFoundException,
-                                                                    ServerException,
-                                                                    BadRequestException {
+    public UserDto getByAlias(@ApiParam(value = "User alias", required = true)
+                              @QueryParam("alias")
+                              @Required String alias) throws NotFoundException,
+                                                             ServerException,
+                                                             BadRequestException {
         if (alias == null) {
             throw new BadRequestException("Missed parameter alias");
         }
@@ -300,18 +218,6 @@ public class UserService extends Service {
         return injectLinks(toDescriptor(user), getServiceContext());
     }
 
-    /**
-     * Removes user with given identifier.
-     *
-     * @param id
-     *         identifier to remove user
-     * @throws NotFoundException
-     *         when user with given identifier doesn't exist
-     * @throws ServerException
-     *         when some error occurred while removing user
-     * @throws ConflictException
-     *         when some error occurred while removing user
-     */
     @DELETE
     @Path("/{id}")
     @GenerateLink(rel = LINK_REL_REMOVE_USER_BY_ID)
@@ -328,20 +234,6 @@ public class UserService extends Service {
         userManager.remove(id);
     }
 
-
-    /**
-     * Allow to check if current user has a given role or not. status <b>200</b>
-     * and {@link UserInRoleDescriptor} is returned by indicating if role is granted or not.
-     *
-     * @param role
-     *         role to search (like admin or manager)
-     * @param scope
-     *         the optional scope like system, workspace, account.(default scope is system)
-     * @param scopeId
-     *         an optional scopeID used by the scope like the workspace ID if scope is workspace.
-     * @return {UserInRoleDescriptor} which indicates if role is granted or not
-     * @throws org.eclipse.che.api.core.ForbiddenException
-     */
     @GET
     @Path("/inrole")
     @GenerateLink(rel = LINK_REL_INROLE)
@@ -351,24 +243,24 @@ public class UserService extends Service {
     @ApiOperation(value = "Check role for the authenticated user",
                   notes = "Check if user has a role in given scope (default is system) and with an optional scope id. " +
                           "Roles allowed: user, system/admin, system/manager.",
-                  response = UserInRoleDescriptor.class)
+                  response = UserInRoleDto.class)
     @ApiResponses({@ApiResponse(code = 200, message = "OK"),
                    @ApiResponse(code = 403, message = "Unable to check for the given scope"),
                    @ApiResponse(code = 500, message = "Internal Server Error")})
-    public UserInRoleDescriptor inRole(@Required @Description("role inside a scope")
-                                       @QueryParam("role")
-                                       String role,
-                                       @DefaultValue("system")
-                                       @Description("scope of the role (like system, workspace)")
-                                       @QueryParam("scope")
-                                       String scope,
-                                       @DefaultValue("")
-                                       @Description("id used by the scope, like workspaceId for workspace scope")
-                                       @QueryParam("scopeId")
-                                       String scopeId,
-                                       @Context
-                                       SecurityContext context) throws NotFoundException,
-                                                                       ForbiddenException {
+    public UserInRoleDto inRole(@Required @Description("role inside a scope")
+                                @QueryParam("role")
+                                String role,
+                                @DefaultValue("system")
+                                @Description("scope of the role (like system, workspace)")
+                                @QueryParam("scope")
+                                String scope,
+                                @DefaultValue("")
+                                @Description("id used by the scope, like workspaceId for workspace scope")
+                                @QueryParam("scopeId")
+                                String scopeId,
+                                @Context
+                                SecurityContext context) throws NotFoundException,
+                                                                ForbiddenException {
         // handle scope
         boolean isInRole;
         if ("system".equals(scope)) {
@@ -385,23 +277,12 @@ public class UserService extends Service {
             throw new ForbiddenException(String.format("Only system scope is handled for now. Provided scope is %s", scope));
         }
 
-        return newDto(UserInRoleDescriptor.class).withIsInRole(isInRole)
-                                                 .withRoleName(role)
-                                                 .withScope(scope)
-                                                 .withScopeId(scopeId);
+        return newDto(UserInRoleDto.class).withIsInRole(isInRole)
+                                          .withRoleName(role)
+                                          .withScope(scope)
+                                          .withScopeId(scopeId);
     }
 
-    /**
-     * Get user by name.
-     *
-     * @param name
-     *         user name
-     * @return found user
-     * @throws NotFoundException
-     *         when user with given name doesn't exist
-     * @throws ServerException
-     *         when some error occurred while retrieving user
-     */
     @GET
     @Path("/name/{name}")
     @GenerateLink(rel = "get user by name")
@@ -412,16 +293,13 @@ public class UserService extends Service {
     @ApiResponses({@ApiResponse(code = 200, message = "OK"),
                    @ApiResponse(code = 404, message = "Not Found"),
                    @ApiResponse(code = 500, message = "Internal Server Error")})
-    public UserDescriptor getByName(@ApiParam(value = "User email")
-                                    @PathParam("name")
-                                    String name) throws NotFoundException, ServerException {
+    public UserDto getByName(@ApiParam(value = "User email")
+                             @PathParam("name")
+                             String name) throws NotFoundException, ServerException {
         final User user = userManager.getByName(name);
         return injectLinks(toDescriptor(user), getServiceContext());
     }
 
-    /**
-     * Get setting of user service
-     */
     @GET
     @Path("/settings")
     @Produces(APPLICATION_JSON)
@@ -429,46 +307,42 @@ public class UserService extends Service {
         return ImmutableMap.of(USER_SELF_CREATION_ALLOWED, Boolean.toString(userSelfCreationAllowed));
     }
 
-    private User fromEntity(UserDescriptor userDescriptor) throws BadRequestException {
-        if (userDescriptor == null) {
-            throw new BadRequestException("User Descriptor required");
-        }
-        if (isNullOrEmpty(userDescriptor.getName())) {
-            throw new BadRequestException("User name required");
-        }
-        if (isNullOrEmpty(userDescriptor.getEmail())) {
-            throw new BadRequestException("User email required");
-        }
-        final User user = new User().withName(userDescriptor.getName())
-                                    .withEmail(userDescriptor.getEmail());
-        if (userDescriptor.getPassword() != null) {
-            checkPassword(userDescriptor.getPassword());
-            user.setPassword(userDescriptor.getPassword());
-        }
-        return user;
+    private User fromEntity(UserDto userDto) throws BadRequestException {
+        checkUser(userDto);
+        return new UserImpl(null,
+                            userDto.getEmail(),
+                            userDto.getName(),
+                            userDto.getPassword(),
+                            null);
     }
 
     private User fromToken(String token) throws UnauthorizedException, ConflictException {
         if (token == null) {
             throw new UnauthorizedException("Missed token parameter");
         }
-        return new User().withEmail(tokenValidator.validateToken(token));
+        final String email = tokenValidator.validateToken(token);
+        final int atIdx = email.indexOf('@');
+        // Getting all the characters before '@' e.g. user@codenvy.com -> user
+        final String name = atIdx == -1 ? email : email.substring(0, atIdx);
+        return new UserImpl(null, email, name, null, null);
     }
 
-    /**
-     * Checks user password conforms some rules:
-     * <ul>
-     * <li> Not null
-     * <li> Must be at least 8 character length
-     * <li> Must contain at least one letter and one digit
-     * </ul>
-     *
-     * @param password
-     *         user's password
-     * @throws BadRequestException
-     *         when password violates any rule
-     */
-    private void checkPassword(String password) throws BadRequestException {
+    private static void checkUser(User user) throws BadRequestException {
+        if (user == null) {
+            throw new BadRequestException("User Descriptor required");
+        }
+        if (isNullOrEmpty(user.getName())) {
+            throw new BadRequestException("User name required");
+        }
+        if (isNullOrEmpty(user.getEmail())) {
+            throw new BadRequestException("User email required");
+        }
+        if (user.getPassword() != null) {
+            checkPassword(user.getPassword());
+        }
+    }
+
+    private static void checkPassword(String password) throws BadRequestException {
         if (password == null) {
             throw new BadRequestException("Password required");
         }
@@ -480,8 +354,7 @@ public class UserService extends Service {
         for (char passwordChar : password.toCharArray()) {
             if (Character.isDigit(passwordChar)) {
                 numOfDigits++;
-            }
-            else if (Character.isLetter(passwordChar)) {
+            } else if (Character.isLetter(passwordChar)) {
                 numOfLetters++;
             }
         }
@@ -490,7 +363,7 @@ public class UserService extends Service {
         }
     }
 
-    private String currentUserId() {
+    private static String subjectId() {
         return EnvironmentContext.getCurrent().getUser().getId();
     }
 }

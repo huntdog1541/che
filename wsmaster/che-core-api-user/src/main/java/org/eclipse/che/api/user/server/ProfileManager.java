@@ -1,13 +1,14 @@
 package org.eclipse.che.api.user.server;
 
-import org.eclipse.che.api.user.server.dao.ProfileImpl;
+import org.eclipse.che.api.core.model.user.Profile;
+import org.eclipse.che.api.user.server.model.impl.ProfileImpl;
 
 import javax.inject.Singleton;
 
 @Singleton
 public class ProfileManager {
 
-    public void create(ProfileImpl profile) {
+    public ProfileImpl create(Profile profile) {
 
     }
 

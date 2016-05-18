@@ -17,9 +17,9 @@ import org.eclipse.che.api.core.NotFoundException;
 import org.eclipse.che.api.core.ServerException;
 import org.eclipse.che.api.core.model.user.Profile;
 import org.eclipse.che.api.core.model.user.User;
-import org.eclipse.che.api.user.server.dao.ProfileImpl;
-import org.eclipse.che.api.user.server.dao.UserDao;
-import org.eclipse.che.api.user.server.dao.UserImpl;
+import org.eclipse.che.api.user.server.model.impl.ProfileImpl;
+import org.eclipse.che.api.user.server.spi.UserDao;
+import org.eclipse.che.api.user.server.model.impl.UserImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +83,7 @@ public class UserManager {
         } catch (ConflictException | ServerException x) {
             // optimistic rollback(won't remove profile if userDao.remove failed)
             // remove operation is not-found-safe so if any exception
-            // during the either user or profile creation occurs remove both entities
+            // during the either user or profile creation occurs remove all entities
             // NOTE: this logic must be replaced with transaction management
             try {
                 userDao.remove(user.getId());

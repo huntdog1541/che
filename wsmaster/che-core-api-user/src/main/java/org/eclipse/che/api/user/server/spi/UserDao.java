@@ -8,12 +8,13 @@
  * Contributors:
  *   Codenvy, S.A. - initial API and implementation
  *******************************************************************************/
-package org.eclipse.che.api.user.server.dao;
+package org.eclipse.che.api.user.server.spi;
 
 import org.eclipse.che.api.core.ConflictException;
 import org.eclipse.che.api.core.NotFoundException;
 import org.eclipse.che.api.core.ServerException;
 import org.eclipse.che.api.core.UnauthorizedException;
+import org.eclipse.che.api.user.server.model.impl.UserImpl;
 
 /**
  * Defies data access object contract for {@link UserImpl}.
@@ -32,7 +33,7 @@ import org.eclipse.che.api.core.UnauthorizedException;
 public interface UserDao {
 
     /**
-     * // TODO remove this method from dao
+     * // TODO remove this method from spi
      * Authenticates user.
      *
      * @param emailOrAliasOrName
