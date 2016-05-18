@@ -25,7 +25,6 @@ import org.eclipse.che.api.core.ConflictException;
 import org.eclipse.che.api.core.ForbiddenException;
 import org.eclipse.che.api.core.NotFoundException;
 import org.eclipse.che.api.core.ServerException;
-import org.eclipse.che.api.core.model.project.ProjectConfig;
 import org.eclipse.che.api.core.rest.Service;
 import org.eclipse.che.api.core.rest.annotations.GenerateLink;
 import org.eclipse.che.api.core.rest.shared.dto.Link;
@@ -818,13 +817,13 @@ public class WorkspaceService extends Service {
                                                         cloneDto(channelParameter).withDefaultValue("workspace:" + workspace.getId()))));
 
         // add machine channels links to machines configs
-        workspace.getConfig()
-                 .getEnvironments()
-                 .stream()
-                 .forEach(environmentDto -> injectMachineChannelsLinks(environmentDto,
-                                                                       workspace.getId(),
-                                                                       workspaceChannelLink,
-                                                                       channelParameter));
+//        workspace.getConfig()
+//                 .getEnvironments()
+//                 .stream()
+//                 .forEach(environmentDto -> injectMachineChannelsLinks(environmentDto,
+//                                                                       workspace.getId(),
+//                                                                       workspaceChannelLink,
+//                                                                       channelParameter));
         // add links for running workspace
         if (workspace.getStatus() == RUNNING) {
             workspace.getRuntime()
@@ -866,19 +865,19 @@ public class WorkspaceService extends Service {
         return workspace.withLinks(links);
     }
 
-    private void injectMachineChannelsLinks(EnvironmentDto environmentDto,
-                                            String workspaceId,
-                                            Link machineChannelLink,
-                                            LinkParameter channelParameter) {
-
-        for (MachineConfigDto machineConfigDto : environmentDto.getMachineConfigs()) {
-            MachineService.injectMachineChannelsLinks(machineConfigDto,
-                                                      workspaceId,
-                                                      environmentDto.getName(),
-                                                      machineChannelLink,
-                                                      channelParameter);
-        }
-    }
+//    private void injectMachineChannelsLinks(EnvironmentDto environmentDto,
+//                                            String workspaceId,
+//                                            Link machineChannelLink,
+//                                            LinkParameter channelParameter) {
+//
+//        for (MachineConfigDto machineConfigDto : environmentDto.getMachineConfigs()) {
+//            MachineService.injectMachineChannelsLinks(machineConfigDto,
+//                                                      workspaceId,
+//                                                      environmentDto.getName(),
+//                                                      machineChannelLink,
+//                                                      channelParameter);
+//        }
+//    }
 
     private SnapshotDto injectLinks(SnapshotDto snapshotDto) {
         final UriBuilder uriBuilder = getServiceContext().getServiceUriBuilder();

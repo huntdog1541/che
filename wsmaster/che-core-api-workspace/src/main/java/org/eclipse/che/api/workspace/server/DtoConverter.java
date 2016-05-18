@@ -23,7 +23,6 @@ import org.eclipse.che.api.machine.shared.dto.SnapshotDto;
 import org.eclipse.che.api.workspace.server.model.impl.stack.StackImpl;
 import org.eclipse.che.api.workspace.shared.dto.EnvironmentDto;
 import org.eclipse.che.api.workspace.shared.dto.ProjectConfigDto;
-import org.eclipse.che.api.workspace.shared.dto.RecipeDto;
 import org.eclipse.che.api.workspace.shared.dto.SourceStorageDto;
 import org.eclipse.che.api.workspace.shared.dto.WorkspaceConfigDto;
 import org.eclipse.che.api.workspace.shared.dto.WorkspaceDto;
@@ -140,20 +139,9 @@ public final class DtoConverter {
 
     /** Converts {@link Environment} to {@link EnvironmentDto}. */
     public static EnvironmentDto asDto(Environment env) {
-        final EnvironmentDto envDto = newDto(EnvironmentDto.class).withName(env.getName());
-        envDto.withMachineConfigs(env.getMachineConfigs()
-                                     .stream()
-                                     .map(org.eclipse.che.api.machine.server.DtoConverter::asDto)
-                                     .collect(toList()));
-        if (env.getRecipe() != null) {
-            envDto.withRecipe(newDto(RecipeDto.class).withType(env.getRecipe().getType())
-                                                     .withScript(env.getRecipe().getScript()));
-        }
         return newDto(EnvironmentDto.class).withName(env.getName())
-                                           .withMachineConfigs(env.getMachineConfigs()
-                                                                  .stream()
-                                                                  .map(org.eclipse.che.api.machine.server.DtoConverter::asDto)
-                                                                  .collect(toList()));
+                                           .withType(env.getType())
+                                           .withConfig(env.getConfig());
     }
 
     /** Converts {@link WorkspaceRuntime} to {@link WorkspaceRuntimeDto}. */

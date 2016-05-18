@@ -10,18 +10,9 @@
  *******************************************************************************/
 package org.eclipse.che.api.workspace.server.model.impl;
 
-import org.eclipse.che.api.core.model.machine.MachineConfig;
-import org.eclipse.che.api.core.model.machine.Recipe;
 import org.eclipse.che.api.core.model.workspace.Environment;
-import org.eclipse.che.api.machine.server.model.impl.MachineConfigImpl;
-import org.eclipse.che.api.machine.server.recipe.RecipeImpl;
-import org.eclipse.che.commons.annotation.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
-
-import static java.util.stream.Collectors.toList;
 
 /**
  * Data object for {@link Environment}.
@@ -30,24 +21,18 @@ import static java.util.stream.Collectors.toList;
  */
 public class EnvironmentImpl implements Environment {
 
-    private String                  name;
-    private RecipeImpl              recipe;
-    private List<MachineConfigImpl> machineConfigs;
+    private String name;
+    private String type;
+    private String config;
 
-    public EnvironmentImpl(String name, Recipe recipe, List<? extends MachineConfig> machineConfigs) {
+    public EnvironmentImpl(String name, String type, String config) {
         this.name = name;
-        if (recipe != null) {
-            this.recipe = new RecipeImpl(recipe);
-        }
-        if (machineConfigs != null) {
-            this.machineConfigs = machineConfigs.stream()
-                                                .map(MachineConfigImpl::new)
-                                                .collect(toList());
-        }
+        this.type = type;
+        this.config = config;
     }
 
     public EnvironmentImpl(Environment environment) {
-        this(environment.getName(), environment.getRecipe(), environment.getMachineConfigs());
+        this(environment.getName(), environment.getType(), environment.getConfig());
     }
 
     @Override
@@ -56,44 +41,36 @@ public class EnvironmentImpl implements Environment {
     }
 
     @Override
-    @Nullable
-    public Recipe getRecipe() {
-        return recipe;
+    public String getType() {
+        return type;
     }
 
     @Override
-    public List<MachineConfigImpl> getMachineConfigs() {
-        if (machineConfigs == null) {
-            machineConfigs = new ArrayList<>();
-        }
-        return machineConfigs;
+    public String getConfig() {
+        return config;
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (!(obj instanceof EnvironmentImpl)) return false;
-        final EnvironmentImpl other = (EnvironmentImpl)obj;
-        return Objects.equals(name, other.name) &&
-               Objects.equals(recipe, other.recipe) &&
-               getMachineConfigs().equals(other.getMachineConfigs());
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof EnvironmentImpl)) return false;
+        EnvironmentImpl that = (EnvironmentImpl)o;
+        return Objects.equals(name, that.name) &&
+               Objects.equals(type, that.type) &&
+               Objects.equals(config, that.config);
     }
 
     @Override
     public int hashCode() {
-        int hash = 7;
-        hash = hash * 31 + Objects.hashCode(name);
-        hash = hash * 31 + Objects.hashCode(recipe);
-        hash = hash * 31 + getMachineConfigs().hashCode();
-        return hash;
+        return Objects.hash(name, type, config);
     }
 
     @Override
     public String toString() {
         return "EnvironmentImpl{" +
                "name='" + name + '\'' +
-               ", recipe=" + recipe +
-               ", machineConfigs=" + machineConfigs +
+               ", type='" + type + '\'' +
+               ", config='" + config + '\'' +
                '}';
     }
 }

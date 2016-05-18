@@ -10,18 +10,8 @@
  *******************************************************************************/
 package org.eclipse.che.api.workspace.shared.dto;
 
-import org.eclipse.che.api.core.factory.FactoryParameter;
-import org.eclipse.che.api.core.model.machine.Recipe;
 import org.eclipse.che.api.core.model.workspace.Environment;
-import org.eclipse.che.api.machine.shared.dto.MachineConfigDto;
 import org.eclipse.che.dto.shared.DTO;
-import org.eclipse.che.dto.shared.DelegateRule;
-import org.eclipse.che.dto.shared.DelegateTo;
-
-import java.util.List;
-
-import static org.eclipse.che.api.core.factory.FactoryParameter.Obligation.MANDATORY;
-import static org.eclipse.che.api.core.factory.FactoryParameter.Obligation.OPTIONAL;
 
 /**
  * @author Alexander Garagatyi
@@ -33,34 +23,29 @@ public interface EnvironmentDto extends Environment {
 
     void setName(String name);
 
-    @Override
-    @FactoryParameter(obligation = OPTIONAL)
-    RecipeDto getRecipe();
+    EnvironmentDto withType(String type);
 
-    void setRecipe(RecipeDto recipe);
+    void setType(String type);
 
-    EnvironmentDto withRecipe(RecipeDto recipe);
+    EnvironmentDto withConfig(String config);
 
-    @Override
-    @FactoryParameter(obligation = MANDATORY)
-    List<MachineConfigDto> getMachineConfigs();
+    void setConfig(String config);
 
-    @DelegateTo(client = @DelegateRule(type = DevMachineResolver.class, method = "getDevMachine"),
-                server = @DelegateRule(type = DevMachineResolver.class, method = "getDevMachine"))
-    MachineConfigDto devMachine();
+    // TODO what to do with factories?
 
-    EnvironmentDto withMachineConfigs(List<MachineConfigDto> machineConfigs);
+    // TODO what to do with this method?
+//    @DelegateTo(client = @DelegateRule(type = DevMachineResolver.class, method = "getDevMachine"),
+//                server = @DelegateRule(type = DevMachineResolver.class, method = "getDevMachine"))
+//    MachineConfigDto devMachine();
 
-    void setMachineConfigs(List<MachineConfigDto> machineConfigs);
-
-    class DevMachineResolver {
-        public static MachineConfigDto getDevMachine(EnvironmentDto environmentDto) {
-            for (MachineConfigDto machineConfigDto : environmentDto.getMachineConfigs()) {
-                if (machineConfigDto.isDev()) {
-                    return machineConfigDto;
-                }
-            }
-            return null;
-        }
-    }
+//    class DevMachineResolver {
+//        public static MachineConfigDto getDevMachine(EnvironmentDto environmentDto) {
+//            for (MachineConfigDto machineConfigDto : environmentDto.getMachineConfigs()) {
+//                if (machineConfigDto.isDev()) {
+//                    return machineConfigDto;
+//                }
+//            }
+//            return null;
+//        }
+//    }
 }

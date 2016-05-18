@@ -170,7 +170,9 @@ public class WorkspaceRuntimes {
             }
             descriptors.put(workspace.getId(), new RuntimeDescriptor(new WorkspaceRuntimeImpl(envName)));
             // Dev machine goes first in the start queue
-            final List<MachineConfigImpl> machineConfigs = activeEnv.getMachineConfigs();
+            // TODO validate environment content on ws creation/update
+            final List<MachineConfigImpl> machineConfigs = activeEnv.getConfig();
+
             final MachineConfigImpl devCfg = rmFirst(machineConfigs, MachineConfig::isDev);
             machineConfigs.add(0, devCfg);
             startQueues.put(workspace.getId(), new ArrayDeque<>(machineConfigs));
