@@ -10,26 +10,20 @@
  *******************************************************************************/
 package org.eclipse.che.api.git;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.regex.Pattern;
 
 /**
- * Commons class for Git and nested modules.
+ * Utility class for working with Git urls.
  *
  * @author Vladyslav Zhukovskii
  * @author Kevin Pollet
  */
-public class GitUrl {
+public class GitUrlUtils {
     public static final Pattern GIT_SSH_URL_PATTERN =
             Pattern.compile("((((git|ssh)://)(([^\\\\/@:]+@)??)[^\\\\/@:]+)|([^\\\\/@:]+@[^\\\\/@:]+))(:|/)[^\\\\@:]+");
 
-    private GitUrl() {
+    private GitUrlUtils() {
 
-    }
-
-    public static String getCodenvyTimeStampKeyLabel() {
-        return "Codenvy SSH Key (" + new SimpleDateFormat().format(new Date()) + ")";
     }
 
     public static boolean isSSH(String url) {

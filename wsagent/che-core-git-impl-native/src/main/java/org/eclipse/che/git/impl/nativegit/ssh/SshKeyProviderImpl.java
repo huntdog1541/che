@@ -19,7 +19,7 @@ import org.eclipse.che.api.core.UnauthorizedException;
 import org.eclipse.che.api.git.GitException;
 import org.eclipse.che.api.ssh.server.SshServiceClient;
 import org.eclipse.che.api.ssh.shared.model.SshPair;
-import org.eclipse.che.api.git.GitUrl;
+import org.eclipse.che.api.git.GitUrlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +55,7 @@ public class SshKeyProviderImpl implements SshKeyProvider {
      */
     @Override
     public byte[] getPrivateKey(String url) throws GitException {
-        String host = GitUrl.getHost(url);
+        String host = GitUrlUtils.getHost(url);
         SshPair pair;
         try {
             pair = sshService.getPair("git", host);

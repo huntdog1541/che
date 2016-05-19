@@ -27,7 +27,7 @@ import org.eclipse.che.api.git.CredentialsLoader;
 import org.eclipse.che.api.git.DiffPage;
 import org.eclipse.che.api.git.GitConnection;
 import org.eclipse.che.api.git.GitException;
-import org.eclipse.che.api.git.GitUrl;
+import org.eclipse.che.api.git.GitUrlUtils;
 import org.eclipse.che.api.git.GitUserResolver;
 import org.eclipse.che.api.git.LogPage;
 import org.eclipse.che.api.git.UserCredential;
@@ -1482,7 +1482,7 @@ class JGitConnection implements GitConnection {
             throws GitException, GitAPIException, UnauthorizedException {
         String sshKeyDirectoryPath = "";
         try {
-            if (GitUrl.isSSH(remoteUrl)) {
+            if (GitUrlUtils.isSSH(remoteUrl)) {
                 File keyDirectory = Files.createTempDir();
                 sshKeyDirectoryPath = keyDirectory.getPath();
                 File sshKey = writePrivateKeyFile(remoteUrl, keyDirectory);
