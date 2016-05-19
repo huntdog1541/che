@@ -219,10 +219,8 @@ class JGitConnection implements GitConnection {
     public void add(AddRequest request) throws GitException {
         add(request, request.isUpdate());
 
-        // "all" option, when update is false, should run git add with both
-        // update true and update false
-        if ((!request.isUpdate()) && request.getAttributes() != null
-            && request.getAttributes().containsKey(ADD_ALL_OPTION)) {
+        // "all" option, when update is false, should run git add with both update true and update false
+        if ((!request.isUpdate()) && request.getAttributes().containsKey(ADD_ALL_OPTION)) {
             add(request, true);
         }
     }
@@ -236,7 +234,7 @@ class JGitConnection implements GitConnection {
         AddCommand addCommand = getGit().add().setUpdate(isUpdate);
 
         List<String> filePatterns = request.getFilepattern();
-        if (filePatterns == null) {
+        if (filePatterns.isEmpty()) {
             filePatterns = AddRequest.DEFAULT_PATTERN;
         }
         filePatterns.forEach(addCommand::addFilepattern);
@@ -258,7 +256,7 @@ class JGitConnection implements GitConnection {
         // checkout files?
         List<String> files = request.getFiles();
         boolean shouldCheckoutToFile = name != null && new File(getWorkingDir(), name).exists();
-        if (shouldCheckoutToFile || (files != null && !files.isEmpty())) {
+        if (shouldCheckoutToFile || !files.isEmpty()) {
             if (shouldCheckoutToFile) {
                 checkoutCommand.addPath(request.getName());
             } else {
@@ -430,10 +428,10 @@ class JGitConnection implements GitConnection {
                                            .setDirectory(new File(request.getWorkingDir()))
                                            .setRemote(request.getRemoteName())
                                            .setURI(remoteUri);
-            if (request.getBranchesToFetch() != null) {
-                cloneCommand.setBranchesToClone(new ArrayList<>(request.getBranchesToFetch()));
-            } else {
+            if (request.getBranchesToFetch().isEmpty()) {
                 cloneCommand.setCloneAllBranches(true);
+            } else {
+                cloneCommand.setBranchesToClone(request.getBranchesToFetch());
             }
 
             executeRemoteCommand(remoteUri, cloneCommand);
@@ -560,7 +558,7 @@ class JGitConnection implements GitConnection {
         try {
             List<RefSpec> fetchRefSpecs;
             List<String> refSpec = request.getRefSpec();
-            if (refSpec != null && refSpec.size() > 0) {
+            if (!refSpec.isEmpty()) {
                 fetchRefSpecs = new ArrayList<>(refSpec.size());
                 for (String refSpecItem : refSpec) {
                     RefSpec fetchRefSpec = (refSpecItem.indexOf(':') < 0) //
@@ -576,7 +574,7 @@ class JGitConnection implements GitConnection {
 
             // If this an unknown remote with no refspecs given, put HEAD
             // (otherwise JGit fails)
-            if (remoteName != null && (refSpec == null || refSpec.isEmpty())) {
+            if (remoteName != null && refSpec.isEmpty()) {
                 boolean found = false;
                 List<Remote> configRemotes = remoteList(newDto(RemoteListRequest.class));
                 for (Remote configRemote : configRemotes) {
@@ -926,15 +924,15 @@ class JGitConnection implements GitConnection {
             if (remoteBranchRef == null) {
                 throw new GitException(String.format(ERROR_PULL_REF_MISSING, remoteBranch));
             }
-            org.eclipse.jgit.api.MergeResult res = getGit().merge().include(remoteBranchRef).call();
-            if (res.getMergeStatus().equals(org.eclipse.jgit.api.MergeResult.MergeStatus.ALREADY_UP_TO_DATE)) {
+            org.eclipse.jgit.api.MergeResult mergeResult = getGit().merge().include(remoteBranchRef).call();
+            if (mergeResult.getMergeStatus().equals(org.eclipse.jgit.api.MergeResult.MergeStatus.ALREADY_UP_TO_DATE)) {
                 return newDto(PullResponse.class).withCommandOutput("Already up-to-date");
             }
 
-            if (res.getConflicts() != null) {
+            if (mergeResult.getConflicts() != null) {
                 StringBuilder message = new StringBuilder(ERROR_PULL_MERGE_CONFLICT_IN_FILES);
                 message.append("\n");
-                Map<String, int[][]> allConflicts = res.getConflicts();
+                Map<String, int[][]> allConflicts = mergeResult.getConflicts();
                 for (String path : allConflicts.keySet()) {
                     message.append(path).append("\n");
                 }
@@ -1014,7 +1012,7 @@ class JGitConnection implements GitConnection {
     @Override
     public void remoteAdd(RemoteAddRequest request) throws GitException {
         String remoteName = request.getName();
-        if (remoteName == null || remoteName.length() == 0) {
+        if (remoteName == null || remoteName.isEmpty()) {
             throw new IllegalArgumentException(ERROR_ADD_REMOTE_NAME_MISSING);
         }
 
@@ -1025,7 +1023,7 @@ class JGitConnection implements GitConnection {
         }
 
         String url = request.getUrl();
-        if (url == null || url.length() == 0) {
+        if (url == null || url.isEmpty()) {
             throw new IllegalArgumentException(ERROR_REMOTE_URL_MISSING);
         }
 
@@ -1044,14 +1042,14 @@ class JGitConnection implements GitConnection {
         }
 
         List<String> branches = request.getBranches();
-        if (branches != null) {
+        if (branches.isEmpty()) {
+            remoteConfig.addFetchRefSpec(
+                    new RefSpec(Constants.R_HEADS + "*" + ":" + Constants.R_REMOTES + remoteName + "/*").setForceUpdate(true));
+        } else {
             for (String branch : branches) {
                 remoteConfig.addFetchRefSpec(new RefSpec(Constants.R_HEADS + branch + ":" + Constants.R_REMOTES + remoteName + "/" + branch)
                                                      .setForceUpdate(true));
             }
-        } else {
-            remoteConfig.addFetchRefSpec(
-                    new RefSpec(Constants.R_HEADS + "*" + ":" + Constants.R_REMOTES + remoteName + "/*").setForceUpdate(true));
         }
 
         remoteConfig.update(config);
@@ -1122,7 +1120,7 @@ class JGitConnection implements GitConnection {
     @Override
     public void remoteUpdate(RemoteUpdateRequest request) throws GitException {
         String remoteName = request.getName();
-        if (remoteName == null || remoteName.length() == 0) {
+        if (remoteName == null || remoteName.isEmpty()) {
             throw new IllegalArgumentException(ERROR_UPDATE_REMOTE_NAME_MISSING);
         }
 
@@ -1139,10 +1137,8 @@ class JGitConnection implements GitConnection {
             throw new GitException(e.getMessage(), e);
         }
 
-        List<String> tmp;
-
-        tmp = request.getBranches();
-        if (tmp != null && tmp.size() > 0) {
+        List<String> branches = request.getBranches();
+        if (branches.size() > 0) {
             if (!request.isAddBranches()) {
                 remoteConfig.setFetchRefSpecs(new ArrayList<>());
                 remoteConfig.setPushRefSpecs(new ArrayList<>());
@@ -1156,7 +1152,7 @@ class JGitConnection implements GitConnection {
             }
 
             // Add new refspec.
-            for (String branch : tmp) {
+            for (String branch : branches) {
                 remoteConfig.addFetchRefSpec(
                         new RefSpec(Constants.R_HEADS + branch + ":" + Constants.R_REMOTES + remoteName + "/" + branch)
                                 .setForceUpdate(true));
@@ -1164,50 +1160,38 @@ class JGitConnection implements GitConnection {
         }
 
         // Remove URLs first.
-        tmp = request.getRemoveUrl();
-        if (tmp != null) {
-            for (String url : tmp) {
-                try {
-                    remoteConfig.removeURI(new URIish(url));
-                } catch (URISyntaxException e) {
-                    LOG.debug(ERROR_REMOVING_INVALID_URL);
-                }
+        for (String url : request.getRemoveUrl()) {
+            try {
+                remoteConfig.removeURI(new URIish(url));
+            } catch (URISyntaxException e) {
+                LOG.debug(ERROR_REMOVING_INVALID_URL);
             }
         }
 
         // Add new URLs.
-        tmp = request.getAddUrl();
-        if (tmp != null) {
-            for (String url : tmp) {
-                try {
-                    remoteConfig.addURI(new URIish(url));
-                } catch (URISyntaxException e) {
-                    throw new IllegalArgumentException("Remote url " + url + " is invalid. ");
-                }
+        for (String url : request.getAddUrl()) {
+            try {
+                remoteConfig.addURI(new URIish(url));
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException("Remote url " + url + " is invalid. ");
             }
         }
 
         // Remove URLs for pushing.
-        tmp = request.getRemovePushUrl();
-        if (tmp != null) {
-            for (String url : tmp) {
-                try {
-                    remoteConfig.removePushURI(new URIish(url));
-                } catch (URISyntaxException e) {
-                    LOG.debug(ERROR_REMOVING_INVALID_URL);
-                }
+        for (String url : request.getRemovePushUrl()) {
+            try {
+                remoteConfig.removePushURI(new URIish(url));
+            } catch (URISyntaxException e) {
+                LOG.debug(ERROR_REMOVING_INVALID_URL);
             }
         }
 
         // Add URLs for pushing.
-        tmp = request.getAddPushUrl();
-        if (tmp != null) {
-            for (String url : tmp) {
-                try {
-                    remoteConfig.addPushURI(new URIish(url));
-                } catch (URISyntaxException e) {
-                    throw new IllegalArgumentException("Remote push url " + url + " is invalid. ");
-                }
+        for (String url : request.getAddPushUrl()) {
+            try {
+                remoteConfig.addPushURI(new URIish(url));
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException("Remote push url " + url + " is invalid. ");
             }
         }
 
