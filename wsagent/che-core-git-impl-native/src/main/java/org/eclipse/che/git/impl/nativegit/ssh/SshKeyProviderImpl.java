@@ -19,7 +19,7 @@ import org.eclipse.che.api.core.UnauthorizedException;
 import org.eclipse.che.api.git.GitException;
 import org.eclipse.che.api.ssh.server.SshServiceClient;
 import org.eclipse.che.api.ssh.shared.model.SshPair;
-import org.eclipse.che.git.impl.nativegit.GitUrl;
+import org.eclipse.che.api.git.GitUrl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
