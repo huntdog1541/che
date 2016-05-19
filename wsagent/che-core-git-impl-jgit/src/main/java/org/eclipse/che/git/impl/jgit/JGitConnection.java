@@ -192,8 +192,9 @@ class JGitConnection implements GitConnection {
     private static final String ERROR_AUTHENTICATION_REQUIRED      = "Authentication is required but no CredentialsProvider has " +
                                                                      "been registered";
     private static final String ERROR_AUTHENTICATION_FAILED        = "fatal: Authentication failed for '%s/'\n";
-    private static final String MESSAGE_COMMIT_NOT_POSSIBLE        = "Commit is not possible because repository state is '%s'";
-    private static final String MESSAGE_AMEND_NOT_POSSIBLE         = "Amend is not possible because repository state is '%s'";
+
+    private static final String MESSAGE_COMMIT_NOT_POSSIBLE = "Commit is not possible because repository state is '%s'";
+    private static final String MESSAGE_AMEND_NOT_POSSIBLE  = "Amend is not possible because repository state is '%s'";
 
     private static final Logger LOG = LoggerFactory.getLogger(JGitConnection.class);
 
@@ -961,7 +962,6 @@ class JGitConnection implements GitConnection {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public PushResponse push(PushRequest request) throws GitException, UnauthorizedException {
         String remoteName = request.getRemote();
         String remoteUri = getRepository().getConfig().getString(ConfigConstants.CONFIG_REMOTE_SECTION, remoteName,
@@ -974,7 +974,7 @@ class JGitConnection implements GitConnection {
                 pushCommand.setRemote(remoteName);
             }
             List<String> refSpec = request.getRefSpec();
-            if (refSpec != null && refSpec.size() > 0) {
+            if (refSpec.size() > 0) {
                 List<RefSpec> refSpecInst = new ArrayList<>(refSpec.size());
                 refSpecInst.addAll(refSpec.stream().map(RefSpec::new).collect(Collectors.toList()));
                 pushCommand.setRefSpecs(refSpecInst);
@@ -987,6 +987,7 @@ class JGitConnection implements GitConnection {
                 pushCommand.setTimeout(timeout);
             }
 
+            @SuppressWarnings("unchecked")
             Iterable<PushResult> list = (Iterable<PushResult>)executeRemoteCommand(remoteUri, pushCommand);
             for (PushResult pushResult : list) {
                 Collection<RemoteRefUpdate> refUpdates = pushResult.getRemoteUpdates();
