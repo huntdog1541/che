@@ -204,7 +204,7 @@ class JGitConnection implements GitConnection {
 
     private final CredentialsLoader credentialsLoader;
     private final SshKeyProvider    sshKeyProvider;
-    private final GitUserResolver userResolver;
+    private final GitUserResolver   userResolver;
     private final Repository        repository;
 
     @Inject
@@ -1364,8 +1364,7 @@ class JGitConnection implements GitConnection {
     @Override
     public List<RemoteReference> lsRemote(LsRemoteRequest request) throws UnauthorizedException, GitException {
         String remoteUrl = request.getRemoteUrl();
-        LsRemoteCommand lsRemoteCommand = getGit().lsRemote();
-        lsRemoteCommand.setRemote(remoteUrl);
+        LsRemoteCommand lsRemoteCommand = getGit().lsRemote().setRemote(remoteUrl);
         Collection<Ref> refs;
         try {
             refs = lsRemoteCommand.call();
@@ -1376,15 +1375,10 @@ class JGitConnection implements GitConnection {
                 throw new GitException(exception.getMessage(), exception);
             }
         }
-        // Translate the JGit result
-        List<RemoteReference> remoteRefs = new ArrayList<>(refs.size());
-        for (Ref ref : refs) {
-            String commitId = ref.getObjectId().name();
-            String name = ref.getName();
-            RemoteReference remoteRef = newDto(RemoteReference.class).withCommitId(commitId).withReferenceName(name);
-            remoteRefs.add(remoteRef);
-        }
-        return remoteRefs;
+
+        return refs.stream()
+                   .map(ref -> newDto(RemoteReference.class).withCommitId(ref.getObjectId().name()).withReferenceName(ref.getName()))
+                   .collect(Collectors.toList());
     }
 
     @Override
@@ -1458,11 +1452,10 @@ class JGitConnection implements GitConnection {
      * Execute remote jgit command.
      *
      * @param remoteUrl
-     *          remote url
+     *         remote url
      * @param command
-     *          command to execute
+     *         command to execute
      * @return executed command
-     *
      * @throws GitException
      * @throws GitAPIException
      * @throws UnauthorizedException
@@ -1536,9 +1529,10 @@ class JGitConnection implements GitConnection {
         final File keyFile = new File(keyDirectory, "identity");
         try (FileOutputStream fos = new FileOutputStream(keyFile)) {
             fos.write(sshKey);
-        } catch (IOException e) {
-            LOG.error("Can't store ssh key. ", e);
-            throw new GitException("Can't store ssh key. ");
+        } catch (IOException exception) {
+            String errorMessage = "Can't store ssh key. ".concat(exception.getMessage());
+            LOG.error(errorMessage, exception);
+            throw new GitException(errorMessage, exception);
         }
         Set<PosixFilePermission> permissions = EnumSet.of(OWNER_READ, OWNER_WRITE);
         try {
@@ -1548,8 +1542,6 @@ class JGitConnection implements GitConnection {
         }
 
         return keyFile;
-
-
     }
 
     private GitUser getUser() throws GitException {
@@ -1573,8 +1565,7 @@ class JGitConnection implements GitConnection {
 
     private String getCurrentBranch() throws GitException {
         try {
-            Ref headRef = repository.exactRef(Constants.HEAD);
-            return Repository.shortenRefName(headRef.getLeaf().getName());
+            return Repository.shortenRefName(repository.exactRef(Constants.HEAD).getLeaf().getName());
         } catch (IOException exception) {
             throw new GitException(exception.getMessage(), exception);
         }
