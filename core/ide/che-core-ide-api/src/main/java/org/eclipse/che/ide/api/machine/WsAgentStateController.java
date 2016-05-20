@@ -39,6 +39,8 @@ import org.eclipse.che.ide.websocket.events.WebSocketClosedEvent;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.eclipse.che.ide.api.machine.WsAgentState.STARTED;
+import static org.eclipse.che.ide.api.machine.WsAgentState.STOPPED;
 import static org.eclipse.che.ide.ui.loaders.initialization.InitialLoadingInfo.Operations.WS_AGENT_BOOTING;
 import static org.eclipse.che.ide.ui.loaders.initialization.OperationInfo.Status.IN_PROGRESS;
 import static org.eclipse.che.ide.ui.loaders.initialization.OperationInfo.Status.SUCCESS;
@@ -81,7 +83,7 @@ public class WsAgentStateController implements ConnectionOpenedHandler, Connecti
 
     public void initialize(DevMachine devMachine) {
         this.devMachine = devMachine;
-        this.state = WsAgentState.STOPPED;
+        this.state = STOPPED;
         initialLoadingInfo.setOperationStatus(WS_AGENT_BOOTING.getValue(), IN_PROGRESS);
         checkHttpConnection();
     }
@@ -89,8 +91,8 @@ public class WsAgentStateController implements ConnectionOpenedHandler, Connecti
     @Override
     public void onClose(WebSocketClosedEvent event) {
         Log.info(getClass(), "Test WS connection closed with code " + event.getCode() + " reason: " + event.getReason());
-        if (state.equals(WsAgentState.STARTED)) {
-            state = WsAgentState.STOPPED;
+        if (state.equals(STARTED)) {
+            state = STOPPED;
             eventBus.fireEvent(WsAgentStateEvent.createWsAgentStoppedEvent());
         }
     }
@@ -98,8 +100,8 @@ public class WsAgentStateController implements ConnectionOpenedHandler, Connecti
     @Override
     public void onError() {
         Log.info(getClass(), "Test WS connection error");
-        if (state.equals(WsAgentState.STARTED)) {
-            state = WsAgentState.STOPPED;
+        if (state.equals(STARTED)) {
+            state = STOPPED;
             eventBus.fireEvent(WsAgentStateEvent.createWsAgentStoppedEvent());
         }
     }
@@ -123,7 +125,7 @@ public class WsAgentStateController implements ConnectionOpenedHandler, Connecti
     }
 
     private void started() {
-        state = WsAgentState.STARTED;
+        state = STARTED;
         initialLoadingInfo.setOperationStatus(WS_AGENT_BOOTING.getValue(), SUCCESS);
         loader.hide();
 
@@ -220,7 +222,7 @@ public class WsAgentStateController implements ConnectionOpenedHandler, Connecti
         }
         messageBus = messageBusProvider.createMachineMessageBus(devMachine.getWsAgentWebSocketUrl());
         messageBus.addOnCloseHandler(this);
-        messageBus.addOnCloseHandler(this);
+        messageBus.addOnErrorHandler(this);
         messageBus.addOnOpenHandler(this);
     }
 }
