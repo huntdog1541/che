@@ -7,6 +7,7 @@
  *
  * Contributors:
  *   Codenvy, S.A. - initial API and implementation
+ *   SAP           - implementation
  *******************************************************************************/
 package org.eclipse.che.git.impl.jgit;
 
