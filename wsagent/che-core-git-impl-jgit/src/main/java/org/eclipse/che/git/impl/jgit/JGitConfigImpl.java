@@ -6,8 +6,7 @@
  * http://www.eclipse.org/legal/epl-v10.html
  *
  * Contributors:
- *   Codenvy, S.A. - API
- *   SAP           - initial implementation
+ *   Codenvy, S.A. - initial API and implementation
  *******************************************************************************/
 package org.eclipse.che.git.impl.jgit;
 

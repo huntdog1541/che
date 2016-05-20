@@ -6,8 +6,7 @@
  * http://www.eclipse.org/legal/epl-v10.html
  *
  * Contributors:
- *   Codenvy, S.A. - API
- *   SAP           - initial implementation
+ *   Codenvy, S.A. - initial API and implementation
  *******************************************************************************/
 package org.eclipse.che.git.impl.jgit;
 
@@ -360,7 +359,7 @@ class JGitConnection implements GitConnection {
     @Override
     public List<Branch> branchList(BranchListRequest request) throws GitException {
         String listMode = request.getListMode();
-        if (listMode != null && !(listMode.equals(BranchListRequest.LIST_ALL) || listMode.equals(BranchListRequest.LIST_REMOTE))) {
+        if (!(listMode == null || listMode.equals(BranchListRequest.LIST_ALL) || listMode.equals(BranchListRequest.LIST_REMOTE))) {
             throw new IllegalArgumentException(String.format(ERROR_UNSUPPORTED_LIST_MODE, listMode));
         }
 
