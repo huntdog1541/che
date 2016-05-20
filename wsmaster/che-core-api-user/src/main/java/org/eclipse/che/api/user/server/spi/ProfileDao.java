@@ -10,10 +10,12 @@
  *******************************************************************************/
 package org.eclipse.che.api.user.server.spi;
 
+import org.eclipse.che.api.core.ConflictException;
 import org.eclipse.che.api.core.NotFoundException;
 import org.eclipse.che.api.core.ServerException;
 import org.eclipse.che.api.core.model.user.Profile;
 import org.eclipse.che.api.core.model.user.User;
+import org.eclipse.che.api.user.server.model.impl.ProfileImpl;
 
 /**
  * Data access object contract for {@link Profile}.
@@ -32,7 +34,7 @@ public interface ProfileDao {
      * @throws ServerException
      *         when any error occurs
      */
-    void create(Profile profile) throws ServerException;
+    void create(Profile profile) throws ServerException, ConflictException;
 
     /**
      * Updates profile by replacing an existing entity with a new one.
@@ -77,5 +79,5 @@ public interface ProfileDao {
      * @throws ServerException
      *         when any other error occurs
      */
-    Profile getById(String id) throws NotFoundException, ServerException;
+    ProfileImpl findById(String id) throws NotFoundException, ServerException;
 }

@@ -25,10 +25,10 @@ import java.util.List;
 import static javax.ws.rs.core.MediaType.APPLICATION_FORM_URLENCODED;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_CURRENT_USER;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_CURRENT_USER_PROFILE;
+import static org.eclipse.che.api.user.server.Constants.LINK_REL_CURRENT_PROFILE;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_USER_BY_EMAIL;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_USER_BY_ID;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_USER_PROFILE_BY_ID;
+import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_PROFILE_BY_ID;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_REMOVE_USER_BY_ID;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_PASSWORD;
 
@@ -52,7 +52,7 @@ public final class LinksInjector {
                                                        .toString(),
                                              null,
                                              APPLICATION_JSON,
-                                             LINK_REL_GET_CURRENT_USER_PROFILE));
+                                             LINK_REL_CURRENT_PROFILE));
             links.add(LinksHelper.createLink(HttpMethod.GET,
                                              uriBuilder.clone().path(UserService.class)
                                                        .path(UserService.class, "getCurrent")
@@ -73,7 +73,7 @@ public final class LinksInjector {
         if (currentUser.isMemberOf("system/admin") || currentUser.isMemberOf("system/manager")) {
             links.add(LinksHelper.createLink(HttpMethod.GET,
                                              uriBuilder.clone().path(UserService.class)
-                                                       .path(UserService.class, "getById")
+                                                       .path(UserService.class, "findById")
                                                        .build(userDescriptor.getId())
                                                        .toString(),
                                              null,
@@ -81,12 +81,12 @@ public final class LinksInjector {
                                              LINK_REL_GET_USER_BY_ID));
             links.add(LinksHelper.createLink(HttpMethod.GET,
                                              uriBuilder.clone().path(ProfileService.class)
-                                                       .path(ProfileService.class, "getById")
+                                                       .path(ProfileService.class, "findById")
                                                        .build(userDescriptor.getId())
                                                        .toString(),
                                              null,
                                              APPLICATION_JSON,
-                                             LINK_REL_GET_USER_PROFILE_BY_ID));
+                                             LINK_REL_GET_PROFILE_BY_ID));
             if (userDescriptor.getEmail() != null) {
                 links.add(LinksHelper.createLink(HttpMethod.GET,
                                                  uriBuilder.clone().path(UserService.class)

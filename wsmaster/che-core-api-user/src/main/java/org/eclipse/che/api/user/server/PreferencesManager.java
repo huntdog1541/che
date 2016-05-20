@@ -14,15 +14,20 @@ import java.util.concurrent.locks.Lock;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Facade for preferences related operations and
- * layer of preferences business logic validation.
+ * Preferences manager layer, simplifies preferences service by
+ * taking all the business logic out from the service and making that logic easily
+ * reusable throughout the system.
+ *
+ * <p>The manager doesn't perform any bean validations and it
+ * is expected that all the incoming objects are valid, nevertheless
+ * this exactly the right place for performing business validations.
  *
  * @author Yevhenii Voevodin
  */
 @Singleton
 public class PreferencesManager {
 
-    private static final Striped<Lock> UPDATE_LOCKS = Striped.lazyWeakLock(100);
+    private static final Striped<Lock> UPDATE_REENTRANT_LOCKS = Striped.lazyWeakLock(16);
 
     @Inject
     private PreferenceDao preferenceDao;
@@ -67,16 +72,16 @@ public class PreferencesManager {
         requireNonNull(userId, "Required non-null user id");
         requireNonNull(preferences, "Required non-null preferences");
         // Holding reference to prevent garbage collection
-        // this lock helps to avoid race-conditions when parallel updates are applied
-        final Lock lock = UPDATE_LOCKS.get(userId);
-        lock.lock();
+        // this reentrantLock helps to avoid race-conditions when parallel updates are applied
+        final Lock reentrantLock = UPDATE_REENTRANT_LOCKS.get(userId);
+        reentrantLock.lock();
         try {
             final Map<String, String> found = preferenceDao.getPreferences(userId);
             found.putAll(preferences);
             preferenceDao.setPreferences(userId, found);
             return found;
         } finally {
-            lock.unlock();
+            reentrantLock.unlock();
         }
     }
 
@@ -145,15 +150,15 @@ public class PreferencesManager {
         requireNonNull(userId, "Required non-null user id");
         requireNonNull(names, "Required non-null preference names");
         // Holding reference to prevent garbage collection
-        // this lock helps to avoid race-conditions when parallel updates are applied
-        final Lock lock = UPDATE_LOCKS.get(userId);
-        lock.lock();
+        // this reentrantLock helps to avoid race-conditions when parallel updates are applied
+        final Lock reentrantLock = UPDATE_REENTRANT_LOCKS.get(userId);
+        reentrantLock.lock();
         try {
             final Map<String, String> preferences = preferenceDao.getPreferences(userId);
             names.forEach(preferences::remove);
             preferenceDao.setPreferences(userId, preferences);
         } finally {
-            lock.unlock();
+            reentrantLock.unlock();
         }
     }
 }

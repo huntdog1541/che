@@ -25,7 +25,7 @@ import java.util.Map;
 
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_REMOVE_PREFERENCES;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_PREFERENCES;
+import static org.eclipse.che.api.user.server.Constants.LIN_REL_PREFERENCES;
 
 /**
  * Preferences REST API.
@@ -66,7 +66,7 @@ public class PreferencesService {
 
     @PUT
     @RolesAllowed("user")
-    @GenerateLink(rel = LINK_REL_UPDATE_PREFERENCES)
+    @GenerateLink(rel = LIN_REL_PREFERENCES)
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON)
     public Map<String, String> update(Map<String, String> preferences) throws ServerException, BadRequestException {
@@ -81,13 +81,12 @@ public class PreferencesService {
     @Consumes(APPLICATION_JSON)
     @GenerateLink(rel = LINK_REL_REMOVE_PREFERENCES)
     @ApiOperation(value = "Remove preferences of current user.",
-                  notes = "if names are not specified, then all preferences will be removed, " +
-                          "otherwise only preferences which name")
-    @ApiResponses(value = {
-            @ApiResponse(code = 204, message = "OK"),
-            @ApiResponse(code = 404, message = "Not Found"),
-            @ApiResponse(code = 409, message = "Preferences names required"),
-            @ApiResponse(code = 500, message = "Internal Server Error")})
+                  notes = "if names are not specified, then all the user's preferences will be removed, " +
+                          "otherwise only the preferences which names are listed")
+    @ApiResponses({@ApiResponse(code = 204, message = "OK"),
+                   @ApiResponse(code = 404, message = "Not Found"),
+                   @ApiResponse(code = 409, message = "Preferences names required"),
+                   @ApiResponse(code = 500, message = "Internal Server Error")})
     public void removePreferences(@ApiParam("Preferences to remove") List<String> names) throws ServerException {
         if (names == null || names.isEmpty()) {
             preferencesManager.remove(subjectId());

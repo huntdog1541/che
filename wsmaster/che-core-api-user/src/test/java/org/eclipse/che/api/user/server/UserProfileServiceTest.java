@@ -51,11 +51,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_CURRENT_USER_PROFILE;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_CURRENT_USER_PROFILE;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_USER_PROFILE_BY_ID;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_PREFERENCES;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_USER_PROFILE_BY_ID;
+import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_CURRENT_PROFILE;
+import static org.eclipse.che.api.user.server.Constants.LINK_REL_CURRENT_PROFILE;
+import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_PROFILE_BY_ID;
+import static org.eclipse.che.api.user.server.Constants.LIN_REL_PREFERENCES;
+import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_PROFILE_BY_ID;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
@@ -169,7 +169,7 @@ public class UserProfileServiceTest {
     @Test
     public void shouldBeAbleToGetCurrentProfile() throws Exception {
         final Profile current = new Profile().withId(testUser.getId()).withUserId(testUser.getId());
-        when(profileDao.getById(current.getId())).thenReturn(current);
+        when(profileDao.findById(current.getId())).thenReturn(current);
 
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH, null);
 
@@ -201,7 +201,7 @@ public class UserProfileServiceTest {
         attributes.put("test1", "test");
         attributes.put("test2", "test");
         final Profile profile = new Profile().withId(testUser.getId()).withAttributes(attributes);
-        when(profileDao.getById(profile.getId())).thenReturn(profile);
+        when(profileDao.findById(profile.getId())).thenReturn(profile);
 
         final ContainerResponse response = makeRequest(HttpMethod.DELETE, SERVICE_PATH + "/attributes", asList("test", "test2"));
 
@@ -218,7 +218,7 @@ public class UserProfileServiceTest {
         attributes.put("test1", "test");
         attributes.put("test2", "test");
         final Profile profile = new Profile().withId(testUser.getId()).withAttributes(attributes);
-        when(profileDao.getById(profile.getId())).thenReturn(profile);
+        when(profileDao.findById(profile.getId())).thenReturn(profile);
 
         final ContainerResponse response = makeRequest(HttpMethod.DELETE, SERVICE_PATH + "/attributes", null);
 
@@ -285,7 +285,7 @@ public class UserProfileServiceTest {
     public void shouldBeAbleToGetProfileById() throws Exception {
         final Profile profile = new Profile().withId(testUser.getId())
                                              .withUserId(testUser.getId());
-        when(profileDao.getById(profile.getId())).thenReturn(profile);
+        when(profileDao.findById(profile.getId())).thenReturn(profile);
 
         final ContainerResponse response = makeRequest(HttpMethod.GET, SERVICE_PATH + "/" + profile.getId(), null);
 
@@ -300,7 +300,7 @@ public class UserProfileServiceTest {
     public void shouldBeAbleToUpdateCurrentProfileAttributes() throws Exception {
         final Profile profile = new Profile().withId(testUser.getId())
                                              .withAttributes(new HashMap<>(singletonMap("existed", "old")));
-        when(profileDao.getById(profile.getId())).thenReturn(profile);
+        when(profileDao.findById(profile.getId())).thenReturn(profile);
         final Map<String, String> attributes = new HashMap<>(4);
         attributes.put("existed", "new");
         attributes.put("new", "value");
@@ -345,7 +345,7 @@ public class UserProfileServiceTest {
         final Profile profile = new Profile().withId(testUser.getId())
                                              .withUserId(testUser.getId())
                                              .withAttributes(new HashMap<>(singletonMap("existed", "old")));
-        when(profileDao.getById(testUser.getId())).thenReturn(profile);
+        when(profileDao.findById(testUser.getId())).thenReturn(profile);
         final Map<String, String> attributes = new HashMap<>(4);
         attributes.put("existed", "new");
         attributes.put("new", "value");
@@ -362,10 +362,10 @@ public class UserProfileServiceTest {
         final Profile profile = new Profile().withId(testUser.getId());
         when(securityContext.isUserInRole("user")).thenReturn(true);
 
-        final Set<String> expectedRels = new HashSet<>(asList(LINK_REL_GET_CURRENT_USER_PROFILE,
-                                                              LINK_REL_UPDATE_CURRENT_USER_PROFILE,
-                                                              LINK_REL_GET_USER_PROFILE_BY_ID,
-                                                              LINK_REL_UPDATE_PREFERENCES));
+        final Set<String> expectedRels = new HashSet<>(asList(LINK_REL_CURRENT_PROFILE,
+                                                              LINK_REL_UPDATE_CURRENT_PROFILE,
+                                                              LINK_REL_GET_PROFILE_BY_ID,
+                                                              LIN_REL_PREFERENCES));
 
         assertEquals(asRels(service.toDescriptor(profile, securityContext).getLinks()), expectedRels);
     }
@@ -375,8 +375,8 @@ public class UserProfileServiceTest {
         final Profile profile = new Profile().withId(testUser.getId());
         when(securityContext.isUserInRole("system/admin")).thenReturn(true);
 
-        final Set<String> expectedRels = new HashSet<>(asList(LINK_REL_UPDATE_USER_PROFILE_BY_ID,
-                                                              LINK_REL_GET_USER_PROFILE_BY_ID));
+        final Set<String> expectedRels = new HashSet<>(asList(LINK_REL_UPDATE_PROFILE_BY_ID,
+                                                              LINK_REL_GET_PROFILE_BY_ID));
 
         assertEquals(asRels(service.toDescriptor(profile, securityContext).getLinks()), expectedRels);
     }
@@ -386,7 +386,7 @@ public class UserProfileServiceTest {
         final Profile profile = new Profile().withId(testUser.getId());
         when(securityContext.isUserInRole("system/manager")).thenReturn(true);
 
-        assertEquals(asRels(service.toDescriptor(profile, securityContext).getLinks()), singleton(LINK_REL_GET_USER_PROFILE_BY_ID));
+        assertEquals(asRels(service.toDescriptor(profile, securityContext).getLinks()), singleton(LINK_REL_GET_PROFILE_BY_ID));
     }
 
     private Set<String> asRels(List<Link> links) {

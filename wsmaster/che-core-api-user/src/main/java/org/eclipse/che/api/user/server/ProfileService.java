@@ -11,338 +11,158 @@
 package org.eclipse.che.api.user.server;
 
 
-import org.eclipse.che.api.core.ConflictException;
+import org.eclipse.che.api.core.BadRequestException;
 import org.eclipse.che.api.core.NotFoundException;
 import org.eclipse.che.api.core.ServerException;
+import org.eclipse.che.api.core.model.user.Profile;
 import org.eclipse.che.api.core.rest.Service;
-import org.eclipse.che.api.core.rest.annotations.Description;
 import org.eclipse.che.api.core.rest.annotations.GenerateLink;
-import org.eclipse.che.api.core.rest.annotations.Required;
-import org.eclipse.che.api.core.rest.shared.dto.Link;
-import org.eclipse.che.api.core.util.LinksHelper;
+import org.eclipse.che.api.user.server.model.impl.ProfileImpl;
+import org.eclipse.che.api.user.shared.dto.ProfileDto;
 import org.eclipse.che.commons.env.EnvironmentContext;
 import org.eclipse.che.dto.server.DtoFactory;
 
-import com.google.common.util.concurrent.Striped;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.annotation.security.RolesAllowed;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
-import javax.ws.rs.HttpMethod;
-import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.SecurityContext;
-import javax.ws.rs.core.UriBuilder;
 
-import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_CURRENT_USER_PROFILE;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_CURRENT_USER_PROFILE;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_USER_PROFILE_BY_ID;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_REMOVE_ATTRIBUTES;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_PREFERENCES;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_USER_PROFILE_BY_ID;
-import static com.google.common.base.Strings.nullToEmpty;
+import static org.eclipse.che.api.user.server.Constants.LINK_REL_CURRENT_PROFILE;
+import static org.eclipse.che.api.user.server.Constants.LINK_REL_CURRENT_PROFILE_ATTRIBUTES;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 
-import java.util.concurrent.locks.Lock;
-
 /**
- * User Profile API
+ * Profile REST API.
  *
- * @author Eugene Voevodin
- * @author Max Shaposhnik
+ * @author Yevhenii Voevodin
  */
-@Api(value = "/profile",
-     description = "User profile manager")
+@Api(value = "/profile", description = "Profile REST API")
 @Path("/profile")
 public class ProfileService extends Service {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ProfileService.class);
-
-    // Assuming 1000 concurrent users at most trying to update their preferences (if more they will wait for another user to finish).
-    // Using the lazy weak version of Striped so the locks will be created on demand and not eagerly, and garbage collected when not needed anymore.
-    private static final Striped<Lock> preferencesUpdateLocksByUser = Striped.lazyWeakLock(1000);
-
-    private final ProfileDao    profileDao;
-    private final UserDao       userDao;
-    private final PreferenceDao preferenceDao;
-
     @Inject
-    public ProfileService(ProfileDao profileDao, PreferenceDao preferenceDao, UserDao userDao) {
-        this.profileDao = profileDao;
-        this.userDao = userDao;
-        this.preferenceDao = preferenceDao;
-    }
+    private ProfileManager       profileManager;
+    @Inject
+    private ProfileLinksInjector linksInjector;
+    @Context
+    private SecurityContext      context;
 
-    /**
-     * <p>Returns {@link ProfileDescriptor} for current user profile.</p>
-     * <p>By default user email will be added to attributes with key <i>'email'</i>.</p>
-     *
-     * @return descriptor of profile
-     * @throws ServerException
-     *         when some error occurred while retrieving/updating profile
-     * @see ProfileDescriptor
-     * @see #updateCurrent(Map, SecurityContext)
-     */
-    @ApiOperation(value = "Get user profile",
-                  notes = "Get user profile details. Roles allowed: user, temp_user",
-                  response = ProfileDescriptor.class)
-    @ApiResponses(value = {
-            @ApiResponse(code = 200, message = "OK"),
-            @ApiResponse(code = 404, message = "Not Found"),
-            @ApiResponse(code = 500, message = "Internal Server Error")})
     @GET
-    @RolesAllowed({"user", "temp_user"})
-    @GenerateLink(rel = LINK_REL_GET_CURRENT_USER_PROFILE)
     @Produces(APPLICATION_JSON)
-    public ProfileDescriptor getCurrent(@Context SecurityContext context) throws NotFoundException, ServerException {
-        final User user = userDao.getById(currentUser().getId());
-        final Profile profile = profileDao.getById(user.getId());
-        profile.getAttributes().put("email", user.getEmail());
-        return toDescriptor(profile, context);
+    @GenerateLink(rel = LINK_REL_CURRENT_PROFILE)
+    @ApiOperation("Get's profile of the logged in user")
+    @ApiResponses({@ApiResponse(code = 200, message = "The response contains requested profile entity"),
+                   @ApiResponse(code = 404, message = "Currently logged in user doesn't have profile"),
+                   @ApiResponse(code = 500, message = "Couldn't retrieve profile due to internal server error")})
+    public ProfileDto getCurrent() throws ServerException, NotFoundException {
+        final ProfileImpl profile = profileManager.findById(subjectId());
+        return linksInjector.injectLinks(asDto(profile), getServiceContext());
     }
 
-
-    /**
-     * Updates attributes of current user profile.
-     *
-     * @param updates
-     *         attributes to update
-     * @return descriptor of updated profile
-     * @throws ServerException
-     *         when some error occurred while retrieving/persisting profile
-     * @see ProfileDescriptor
-     */
-
-    @POST
-    @RolesAllowed("user")
-    @GenerateLink(rel = LINK_REL_UPDATE_CURRENT_USER_PROFILE)
-    @Consumes(APPLICATION_JSON)
-    @Produces(APPLICATION_JSON)
-    public ProfileDescriptor updateCurrent(@Description("attributes to update") Map<String, String> updates,
-                                           @Context SecurityContext context) throws NotFoundException, ServerException, ConflictException {
-        if (updates == null || updates.isEmpty()) {
-            throw new ConflictException("Attributes to update required");
-        }
-        final User user = userDao.getById(currentUser().getId());
-        final Profile profile = profileDao.getById(user.getId());
-        profile.getAttributes().putAll(updates);
-        profileDao.update(profile);
-        logEventUserUpdateProfile(user, profile.getAttributes());
-        return toDescriptor(profile, context);
-    }
-
-
-    /**
-     * Updates attributes of certain profile.
-     *
-     * @param profileId
-     *         profile identifier
-     * @param updates
-     *         attributes to update
-     * @return descriptor of updated profile
-     * @throws NotFoundException
-     *         when profile with given identifier doesn't exist
-     * @throws ServerException
-     *         when some error occurred while retrieving/updating profile
-     * @see ProfileDescriptor
-     * @see #getById(String, SecurityContext)
-     */
-
-    @POST
-    @Path("/{id}")
-    @RolesAllowed({"system/admin"})
-    @Consumes(APPLICATION_JSON)
-    @Produces(APPLICATION_JSON)
-    public ProfileDescriptor update(@PathParam("id") String profileId,
-                                    Map<String, String> updates,
-                                    @Context SecurityContext context) throws NotFoundException, ServerException, ConflictException {
-        if (updates == null || updates.isEmpty()) {
-            throw new ConflictException("Attributes to update required");
-        }
-        final Profile profile = profileDao.getById(profileId);
-        profile.getAttributes().putAll(updates);
-        profileDao.update(profile);
-        final User user = userDao.getById(profile.getUserId());
-        logEventUserUpdateProfile(user, profile.getAttributes());
-        return toDescriptor(profile, context);
-    }
-
-    /**
-     * Searches for profile with given identifier and {@link ProfileDescriptor} if found.
-     *
-     * @param profileId
-     *         profile identifier
-     * @return descriptor of found profile
-     * @throws NotFoundException
-     *         when profile with given identifier doesn't exist
-     * @throws ServerException
-     *         when some error occurred while retrieving user or profile
-     * @see ProfileDescriptor
-     * @see #getById(String, SecurityContext)
-     */
-    @ApiOperation(value = "Get profile of a specific user",
-                  notes = "Get profile of a specific user. Roles allowed: system/admin, system/manager",
-                  response = ProfileDescriptor.class)
-    @ApiResponses(value = {
-            @ApiResponse(code = 200, message = "OK"),
-            @ApiResponse(code = 404, message = "Not Found"),
-            @ApiResponse(code = 500, message = "Internal Server Error")})
     @GET
     @Path("/{id}")
-    @RolesAllowed({"user", "system/admin", "system/manager"})
     @Produces(APPLICATION_JSON)
-    public ProfileDescriptor getById(@ApiParam(value = "  ID")
-                                     @PathParam("id")
-                                     String profileId,
-                                     @Context SecurityContext context) throws NotFoundException, ServerException {
-        final Profile profile = profileDao.getById(profileId);
-        final User user = userDao.getById(profile.getUserId());
-        profile.getAttributes().put("email", user.getEmail());
-        return toDescriptor(profile, context);
+    @ApiOperation("Gets profile by user's id")
+    @GenerateLink(rel = LINK_REL_CURRENT_PROFILE)
+    @ApiResponses({@ApiResponse(code = 200, message = "The response contains requested profile entity"),
+                   @ApiResponse(code = 404, message = "Profile for the user with requested identifier doesn't exist"),
+                   @ApiResponse(code = 500, message = "Couldn't retrieve profile due to internal server error")})
+    public ProfileDto getById(@ApiParam("User identifier")
+                              @PathParam("id")
+                              String userId) throws NotFoundException, ServerException {
+        return asDto(profileManager.findById(userId));
     }
 
-    /**
-     * Removes attributes with given names from current user profile.
-     * If names are {@code null} - all attributes will be removed
-     *
-     * @param attrNames
-     *         attributes names to remove
-     * @throws ConflictException
-     *         when given list of attributes names is {@code null}
-     * @throws ServerException
-     *         when some error occurred while retrieving/updating profile
-     */
-    @ApiOperation(value = "Remove attributes of a current user",
-                  notes = "Remove attributes of a current user",
-                  position = 6)
-    @ApiResponses(value = {
-            @ApiResponse(code = 204, message = "OK"),
-            @ApiResponse(code = 404, message = "Not Found"),
-            @ApiResponse(code = 409, message = "Attributes names required"),
-            @ApiResponse(code = 500, message = "Internal Server Error")})
+    @PUT
+    @Path("/{id}/attributes")
+    @Consumes(APPLICATION_JSON)
+    @Produces(APPLICATION_JSON)
+    @ApiOperation(value = "Updates the profile attributes of the user with requested identifier",
+                  notes = "The replace strategy is used for the update, so all the existing profile " +
+                          "attributes will be override by the profile update")
+    @ApiResponses({@ApiResponse(code = 200, message = "The profile successfully updated and the response contains" +
+                                                      "newly updated profile entity"),
+                   @ApiResponse(code = 404, message = "When profile for the user with requested identifier doesn't exist"),
+                   @ApiResponse(code = 500, message = "Couldn't retrieve profile due to internal server error")})
+    public ProfileDto updateAttributesById(@ApiParam("Id of the user")
+                                           @PathParam("id")
+                                           String userId,
+                                           @ApiParam("New profile attributes")
+                                           Map<String, String> updates) throws NotFoundException,
+                                                                               ServerException,
+                                                                               BadRequestException {
+        if (updates == null || updates.isEmpty()) {
+            throw new BadRequestException("Update attributes required");
+        }
+        final ProfileImpl profile = profileManager.findById(userId);
+        profile.setAttributes(updates);
+        return asDto(profile);
+    }
+
+    @PUT
+    @Path("/attributes")
+    @Consumes(APPLICATION_JSON)
+    @Produces(APPLICATION_JSON)
+    @GenerateLink(rel = LINK_REL_CURRENT_PROFILE_ATTRIBUTES)
+    @ApiOperation(value = "Updates the profile attributes of the currently logged in user",
+                  notes = "The replace strategy is used for the update, so all the existing profile " +
+                          "attributes will be override with incoming values")
+    public ProfileDto updateAttributes(@ApiParam("New profile attributes")
+                                       Map<String, String> updates) throws NotFoundException,
+                                                                           ServerException,
+                                                                           BadRequestException {
+        if (updates == null || updates.isEmpty()) {
+            throw new BadRequestException("Update attributes required");
+        }
+        final ProfileImpl profile = profileManager.findById(subjectId());
+        profile.setAttributes(updates);
+        return asDto(profile);
+    }
+
     @DELETE
     @Path("/attributes")
-    @GenerateLink(rel = LINK_REL_REMOVE_ATTRIBUTES)
-    @RolesAllowed({"user", "temp_user"})
+    @GenerateLink(rel = LINK_REL_CURRENT_PROFILE_ATTRIBUTES)
     @Consumes(APPLICATION_JSON)
-    public void removeAttributes(@ApiParam(value = "Attributes", required = true)
-                                 @Required
-                                 @Description("Attributes names to remove")
-                                 List<String> attrNames,
-                                 @Context SecurityContext context) throws NotFoundException, ServerException, ConflictException {
-        final Profile currentProfile = profileDao.getById(currentUser().getId());
-        if (attrNames == null) {
-            currentProfile.getAttributes().clear();
+    @ApiOperation(value = "Remove profile attributes which names are equal to given",
+                  notes = "If names list is not send, all the attributes will be removed, " +
+                          "if there are no attributes which names equal to some of the given names, " +
+                          "then those names are skipped.")
+    @ApiResponses({@ApiResponse(code = 204, message = "Attributes successfully removed"),
+                   @ApiResponse(code = 500, message = "Couldn't remove attributes due to internal server error")})
+    public void removeAttributes(@ApiParam("The names of the profile attributes to remove")
+                                 List<String> names) throws NotFoundException, ServerException {
+        final Profile profile = profileManager.findById(subjectId());
+        final Map<String, String> attributes = profile.getAttributes();
+        if (names == null) {
+            attributes.clear();
         } else {
-            for (String attributeName : attrNames) {
-                currentProfile.getAttributes().remove(attributeName);
-            }
+            names.forEach(attributes::remove);
         }
-        profileDao.update(currentProfile);
+        profileManager.update(profile);
     }
 
-    /**
-     * Converts {@link Profile} to {@link ProfileDescriptor}
-     */
-    /* package-private used in tests*/ProfileDescriptor toDescriptor(Profile profile, SecurityContext context) {
-        final UriBuilder uriBuilder = getServiceContext().getServiceUriBuilder();
-        final List<Link> links = new LinkedList<>();
-        if (context.isUserInRole("user")) {
-            links.add(LinksHelper.createLink(HttpMethod.GET,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "getCurrent")
-                                                       .build()
-                                                       .toString(),
-                                             null,
-                                             APPLICATION_JSON,
-                                             LINK_REL_GET_CURRENT_USER_PROFILE));
-            links.add(LinksHelper.createLink(HttpMethod.GET,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "getById")
-                                                       .build(profile.getId())
-                                                       .toString(),
-                                             null,
-                                             APPLICATION_JSON,
-                                             LINK_REL_GET_USER_PROFILE_BY_ID));
-            links.add(LinksHelper.createLink(HttpMethod.POST,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "updateCurrent")
-                                                       .build()
-                                                       .toString(),
-                                             APPLICATION_JSON,
-                                             APPLICATION_JSON,
-                                             LINK_REL_UPDATE_CURRENT_USER_PROFILE));
-            links.add(LinksHelper.createLink(HttpMethod.POST,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "update")
-                                                       .build()
-                                                       .toString(),
-                                             APPLICATION_JSON,
-                                             APPLICATION_JSON,
-                                             LINK_REL_UPDATE_PREFERENCES));
-        }
-        if (context.isUserInRole("system/admin") || context.isUserInRole("system/manager")) {
-            links.add(LinksHelper.createLink(HttpMethod.GET,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "getById")
-                                                       .build(profile.getId())
-                                                       .toString(),
-                                             null,
-                                             APPLICATION_JSON,
-                                             LINK_REL_GET_USER_PROFILE_BY_ID));
-        }
-        if (context.isUserInRole("system/admin")) {
-            links.add(LinksHelper.createLink(HttpMethod.POST,
-                                             uriBuilder.clone()
-                                                       .path(getClass(), "update")
-                                                       .build(profile.getId())
-                                                       .toString(),
-                                             APPLICATION_JSON,
-                                             APPLICATION_JSON,
-                                             LINK_REL_UPDATE_USER_PROFILE_BY_ID));
-        }
-        return DtoFactory.getInstance().createDto(ProfileDescriptor.class)
+    private static ProfileDto asDto(Profile profile) {
+        return DtoFactory.newDto(ProfileDto.class)
                          .withId(profile.getId())
-                         .withUserId(profile.getUserId())
-                         .withAttributes(profile.getAttributes())
-                         .withLinks(links);
+                         .withAttributes(profile.getAttributes());
     }
 
-    private org.eclipse.che.commons.user.User currentUser() {
-        return EnvironmentContext.getCurrent().getUser();
-    }
-
-    private void logEventUserUpdateProfile(User user, Map<String, String> attributes) {
-        final Set<String> emails = new HashSet<>(user.getAliases());
-        emails.add(user.getEmail());
-
-        LOG.info("EVENT#user-update-profile# USER#{}# FIRSTNAME#{}# LASTNAME#{}# COMPANY#{}# PHONE#{}# JOBTITLE#{}# EMAILS#{}# USER-ID#{}#",
-                 user.getEmail(),
-                 nullToEmpty(attributes.get("firstName")),
-                 nullToEmpty(attributes.get("lastName")),
-                 nullToEmpty(attributes.get("employer")),
-                 nullToEmpty(attributes.get("phone")),
-                 nullToEmpty(attributes.get("jobtitle")),
-                 user.getAliases(),
-                 user.getId());
+    private static String subjectId() {
+        return EnvironmentContext.getCurrent().getUser().getId();
     }
 }

@@ -31,13 +31,6 @@ public interface ProfileDto extends Profile {
 
     ProfileDto withId(String id);
 
-    @ApiModelProperty("User ID")
-    String getUserId();
-
-    void setUserId(String id);
-
-    ProfileDto withUserId(String id);
-
     @ApiModelProperty("Profile attributes")
     Map<String, String> getAttributes();
 

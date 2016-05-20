@@ -72,7 +72,7 @@ public interface StackDao {
      * <p>Existed stack will be fully updated(replaced), all data which wos present before update will not be accessible
      * with {@code update} anymore</p> Expected update usage:
      * <pre>
-     *     StackImpl stack = stackDao.getById("stack111");
+     *     StackImpl stack = stackDao.findById("stack111");
      *     ...
      *     stack.setDescription("Java stack);
      *     ...

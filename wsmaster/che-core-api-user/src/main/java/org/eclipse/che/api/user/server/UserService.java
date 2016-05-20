@@ -16,7 +16,6 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 
-import com.google.common.annotations.Beta;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 
@@ -28,12 +27,10 @@ import org.eclipse.che.api.core.ServerException;
 import org.eclipse.che.api.core.UnauthorizedException;
 import org.eclipse.che.api.core.model.user.User;
 import org.eclipse.che.api.core.rest.Service;
-import org.eclipse.che.api.core.rest.annotations.Description;
 import org.eclipse.che.api.core.rest.annotations.GenerateLink;
 import org.eclipse.che.api.core.rest.annotations.Required;
 import org.eclipse.che.api.user.server.model.impl.UserImpl;
 import org.eclipse.che.api.user.shared.dto.UserDto;
-import org.eclipse.che.api.user.shared.dto.UserInRoleDto;
 import org.eclipse.che.commons.env.EnvironmentContext;
 
 import javax.annotation.security.RolesAllowed;
@@ -63,12 +60,10 @@ import static org.eclipse.che.api.user.server.Constants.LINK_REL_CREATE_USER;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_CURRENT_USER;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_USER_BY_EMAIL;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_GET_USER_BY_ID;
-import static org.eclipse.che.api.user.server.Constants.LINK_REL_INROLE;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_REMOVE_USER_BY_ID;
 import static org.eclipse.che.api.user.server.Constants.LINK_REL_UPDATE_PASSWORD;
 import static org.eclipse.che.api.user.server.DtoConverter.toDescriptor;
 import static org.eclipse.che.api.user.server.LinksInjector.injectLinks;
-import static org.eclipse.che.dto.server.DtoFactory.newDto;
 
 /**
  * Provides REST API for user management.
@@ -232,55 +227,6 @@ public class UserService extends Service {
                                                                                        ServerException,
                                                                                        ConflictException {
         userManager.remove(id);
-    }
-
-    @GET
-    @Path("/inrole")
-    @GenerateLink(rel = LINK_REL_INROLE)
-    @RolesAllowed({"temp_user", "user", "system/admin", "system/manager"})
-    @Produces(APPLICATION_JSON)
-    @Beta
-    @ApiOperation(value = "Check role for the authenticated user",
-                  notes = "Check if user has a role in given scope (default is system) and with an optional scope id. " +
-                          "Roles allowed: user, system/admin, system/manager.",
-                  response = UserInRoleDto.class)
-    @ApiResponses({@ApiResponse(code = 200, message = "OK"),
-                   @ApiResponse(code = 403, message = "Unable to check for the given scope"),
-                   @ApiResponse(code = 500, message = "Internal Server Error")})
-    public UserInRoleDto inRole(@Required @Description("role inside a scope")
-                                @QueryParam("role")
-                                String role,
-                                @DefaultValue("system")
-                                @Description("scope of the role (like system, workspace)")
-                                @QueryParam("scope")
-                                String scope,
-                                @DefaultValue("")
-                                @Description("id used by the scope, like workspaceId for workspace scope")
-                                @QueryParam("scopeId")
-                                String scopeId,
-                                @Context
-                                SecurityContext context) throws NotFoundException,
-                                                                ForbiddenException {
-        // handle scope
-        boolean isInRole;
-        if ("system".equals(scope)) {
-            String roleToCheck;
-            if ("user".equals(role) || "temp_user".equals(role)) {
-                roleToCheck = role;
-            } else {
-                roleToCheck = "system/" + role;
-            }
-
-            // check role
-            isInRole = context.isUserInRole(roleToCheck);
-        } else {
-            throw new ForbiddenException(String.format("Only system scope is handled for now. Provided scope is %s", scope));
-        }
-
-        return newDto(UserInRoleDto.class).withIsInRole(isInRole)
-                                          .withRoleName(role)
-                                          .withScope(scope)
-                                          .withScopeId(scopeId);
     }
 
     @GET
