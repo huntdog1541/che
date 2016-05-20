@@ -49,7 +49,7 @@ abstract class AbstractMessageBus implements MessageBus {
     /** Timer for sending heartbeat pings to prevent autoclosing an idle WebSocket connection. */
     private final Timer                                    heartbeatTimer;
     /** Timer for reconnecting WebSocket. */
-    private       Timer                                    reconnectionTimer;
+    private final Timer                                    reconnectionTimer;
     private final Message                                  heartbeatMessage;
     private final String                                   wsConnectionUrl;
     private final List<String>                             messages2send;
