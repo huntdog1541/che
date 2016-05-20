@@ -65,7 +65,6 @@ public class PlainJavaPageViewImpl implements PlainJavaPageView {
         return rootElement;
     }
 
-
     @Override
     public String getSourceFolder() {
         return sourceFolderField.getText();
