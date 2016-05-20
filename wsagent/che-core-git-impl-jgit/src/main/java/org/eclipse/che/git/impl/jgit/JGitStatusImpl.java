@@ -30,29 +30,18 @@ import java.util.List;
  */
 public class JGitStatusImpl implements Status, InfoPage {
 
-    private String branchName;
-
+    private String       branchName;
     private StatusFormat format;
-
-    private boolean clean;
-
+    private boolean      clean;
     private List<String> added;
-
     private List<String> changed;
-
     private List<String> removed;
-
     private List<String> missing;
-
     private List<String> modified;
-
     private List<String> untracked;
-
     private List<String> untrackedFolders;
-
     private List<String> conflicting;
-
-    private String repositoryState;
+    private String       repositoryState;
 
     /**
      * @param branchName

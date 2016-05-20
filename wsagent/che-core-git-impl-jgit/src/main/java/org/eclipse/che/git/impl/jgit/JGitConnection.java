@@ -89,6 +89,7 @@ import org.eclipse.jgit.api.PushCommand;
 import org.eclipse.jgit.api.RebaseCommand;
 import org.eclipse.jgit.api.RebaseResult;
 import org.eclipse.jgit.api.ResetCommand;
+import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.RmCommand;
 import org.eclipse.jgit.api.TagCommand;
 import org.eclipse.jgit.api.TransportCommand;
@@ -972,7 +973,7 @@ class JGitConnection implements GitConnection {
                 pushCommand.setRemote(remoteName);
             }
             List<String> refSpec = request.getRefSpec();
-            if (refSpec.size() > 0) {
+            if (!refSpec.isEmpty()) {
                 List<RefSpec> refSpecInst = new ArrayList<>(refSpec.size());
                 refSpecInst.addAll(refSpec.stream().map(RefSpec::new).collect(Collectors.toList()));
                 pushCommand.setRefSpecs(refSpecInst);
@@ -1138,7 +1139,7 @@ class JGitConnection implements GitConnection {
         }
 
         List<String> branches = request.getBranches();
-        if (branches.size() > 0) {
+        if (!branches.isEmpty()) {
             if (!request.isAddBranches()) {
                 remoteConfig.setFetchRefSpecs(new ArrayList<>());
                 remoteConfig.setPushRefSpecs(new ArrayList<>());
@@ -1209,22 +1210,26 @@ class JGitConnection implements GitConnection {
         try {
             ResetCommand resetCommand = getGit().reset();
             resetCommand.setRef(request.getCommit());
-            int filePatternsAmount = request.getFilePattern().size();
-            for (int i = 0; i < filePatternsAmount; i++) {
-                resetCommand.addPath(request.getFilePattern().get(i));
-            }
+            List<String> patterns = request.getFilePattern();
+            patterns.stream().forEach(resetCommand::addPath);
 
-            if (request.getType() != null && filePatternsAmount == 0) {
-                if (request.getType().equals(ResetRequest.ResetType.HARD)) {
-                    resetCommand.setMode(ResetCommand.ResetType.HARD);
-                } else if (request.getType().equals(ResetRequest.ResetType.KEEP)) {
-                    resetCommand.setMode(ResetCommand.ResetType.KEEP);
-                } else if (request.getType().equals(ResetRequest.ResetType.MERGE)) {
-                    resetCommand.setMode(ResetCommand.ResetType.MERGE);
-                } else if (request.getType().equals(ResetRequest.ResetType.MIXED)) {
-                    resetCommand.setMode(ResetCommand.ResetType.MIXED);
-                } else if (request.getType().equals(ResetRequest.ResetType.SOFT)) {
-                    resetCommand.setMode(ResetCommand.ResetType.SOFT);
+            if (request.getType() != null && patterns.isEmpty()) {
+                switch (request.getType()) {
+                    case HARD:
+                        resetCommand.setMode(ResetType.HARD);
+                        break;
+                    case KEEP:
+                        resetCommand.setMode(ResetType.KEEP);
+                        break;
+                    case MERGE:
+                        resetCommand.setMode(ResetType.MERGE);
+                        break;
+                    case MIXED:
+                        resetCommand.setMode(ResetType.MIXED);
+                        break;
+                    case SOFT:
+                        resetCommand.setMode(ResetType.SOFT);
+                        break;
                 }
             }
 
@@ -1568,8 +1573,7 @@ class JGitConnection implements GitConnection {
 
     private String getCurrentBranch() throws GitException {
         try {
-            Ref headRef;
-            headRef = repository.exactRef(Constants.HEAD);
+            Ref headRef = repository.exactRef(Constants.HEAD);
             return Repository.shortenRefName(headRef.getLeaf().getName());
         } catch (IOException exception) {
             throw new GitException(exception.getMessage(), exception);
