@@ -44,8 +44,6 @@ import org.eclipse.che.ide.api.extension.ExtensionGinModule;
 import org.eclipse.che.ide.api.extension.ExtensionRegistry;
 import org.eclipse.che.ide.api.factory.FactoryServiceClient;
 import org.eclipse.che.ide.api.factory.FactoryServiceClientImpl;
-import org.eclipse.che.ide.api.factory.ParametersFactoryServiceClient;
-import org.eclipse.che.ide.api.factory.ParametersFactoryServiceClientImpl;
 import org.eclipse.che.ide.api.filetypes.FileType;
 import org.eclipse.che.ide.api.filetypes.FileTypeRegistry;
 import org.eclipse.che.ide.api.git.GitServiceClient;
@@ -329,7 +327,6 @@ public class CoreGinModule extends AbstractGinModule {
         bind(GitServiceClient.class).to(GitServiceClientImpl.class).in(Singleton.class);
         bind(OAuthServiceClient.class).to(OAuthServiceClientImpl.class).in(Singleton.class);
         bind(FactoryServiceClient.class).to(FactoryServiceClientImpl.class).in(Singleton.class);
-        bind(ParametersFactoryServiceClient.class).to(ParametersFactoryServiceClientImpl.class).in(Singleton.class);
         bind(ProjectServiceClient.class).to(ProjectServiceClientImpl.class).in(Singleton.class);
         bind(WorkspaceServiceClient.class).to(WorkspaceServiceClientImpl.class).in(Singleton.class);
         bind(SshServiceClient.class).to(SshServiceClientImpl.class).in(Singleton.class);

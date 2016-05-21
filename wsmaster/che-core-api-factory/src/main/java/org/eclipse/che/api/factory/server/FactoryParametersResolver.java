@@ -18,13 +18,16 @@ import java.util.Map;
 
 /**
  * Defines a resolver that will produce factories for some parameters
+ *
  * @author Florent Benoit
  */
 public interface FactoryParametersResolver {
 
     /**
      * Resolver acceptance based on the given parameters.
-     * @param factoryParameters map of parameters dedicated to factories
+     *
+     * @param factoryParameters
+     *         map of parameters dedicated to factories
      * @return true if it will be accepted by the resolver implementation or false if it is not accepted
      */
     boolean accept(@NotNull Map<String, String> factoryParameters);
@@ -34,8 +37,8 @@ public interface FactoryParametersResolver {
      *
      * @param factoryParameters
      *         map containing factory data parameters provided through URL
-     *
-     * @throws BadRequestException when data are invalid
+     * @throws BadRequestException
+     *         when data are invalid
      */
     Factory createFactory(@NotNull Map<String, String> factoryParameters) throws BadRequestException;
 
