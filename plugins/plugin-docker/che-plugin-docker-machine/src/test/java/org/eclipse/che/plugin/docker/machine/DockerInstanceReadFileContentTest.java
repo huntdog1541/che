@@ -10,19 +10,22 @@
  *******************************************************************************/
 package org.eclipse.che.plugin.docker.machine;
 
-import org.eclipse.che.api.core.ConflictException;
+import org.eclipse.che.api.core.model.machine.Machine;
+import org.eclipse.che.api.core.model.machine.MachineConfig;
 import org.eclipse.che.api.core.model.machine.MachineStatus;
+import org.eclipse.che.api.core.util.LineConsumer;
 import org.eclipse.che.api.machine.server.exception.MachineException;
 import org.eclipse.che.api.machine.server.model.impl.LimitsImpl;
 import org.eclipse.che.api.machine.server.model.impl.MachineConfigImpl;
 import org.eclipse.che.api.machine.server.model.impl.MachineImpl;
 import org.eclipse.che.api.machine.server.model.impl.MachineSourceImpl;
-import org.eclipse.che.api.machine.server.model.impl.ServerConfImpl;
+import org.eclipse.che.api.machine.server.spi.InstanceKey;
 import org.eclipse.che.plugin.docker.client.DockerConnector;
 import org.eclipse.che.plugin.docker.client.Exec;
 import org.eclipse.che.plugin.docker.client.LogMessage;
 import org.eclipse.che.plugin.docker.client.MessageProcessor;
-import org.mockito.Matchers;
+import org.eclipse.che.plugin.docker.client.params.CommitParams;
+import org.eclipse.che.plugin.docker.machine.node.DockerNode;
 import org.mockito.Mock;
 import org.mockito.testng.MockitoTestNGListener;
 import org.testng.annotations.BeforeMethod;
@@ -30,131 +33,185 @@ import org.testng.annotations.Listeners;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.util.Collections;
 
-import static java.util.Arrays.asList;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.anyVararg;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 
 /**
+ * Tests for {@link DockerInstance}.
+ *
  * @author Anton Korneta
  */
-@Listeners(value = {MockitoTestNGListener.class})
+@Listeners(MockitoTestNGListener.class)
 public class DockerInstanceReadFileContentTest {
+    private static final String        FILE_PATH    = "/tmp";
+    private static final String        CONTAINER    = "container144";
+    private static final String        OWNER        = "tony12";
+    private static final String        IMAGE        = "iamage12";
+    private static final String        MACHINE_ID   = "machine12";
+    private static final String        WORKSPACE_ID = "workspace12";
+    private static final String        NAME         = "suse-jdk";
+    private static final String        TYPE         = "docker";
+    private static final String        REGISTRY     = "registry";
+    private static final String        REPOSITORY   = "eclipse-che";
+    private static final String        TAG          = "latest";
+    private static final MachineStatus STATUS       = MachineStatus.RUNNING;
+
+    @Mock
+    private LogMessage                 logMessageMock;
+    @Mock
+    private Exec                       execMock;
+    @Mock
+    private DockerConnector            dockerConnectorMock;
+    @Mock
+    private DockerInstanceStopDetector dockerInstanceStopDetectorMock;
 
     private DockerInstance dockerInstance;
 
-    @Mock
-    private DockerConnector dockerConnector;
-    @Mock
-    private DockerInstanceStopDetector dockerInstanceStopDetector;
-
-    @Mock
-    private LogMessage logMessage;
-    @Mock
-    private Exec       exec;
-
     @BeforeMethod
     public void setUp() throws IOException {
-
-        dockerInstance = spy(new DockerInstance(dockerConnector,
-                                                null,
-                                                null,
-                                                new MachineImpl(
-                                                        new MachineConfigImpl(false,
-                                                                              "Display name",
-                                                                              "machineType",
-                                                                              new MachineSourceImpl("type", "location"),
-                                                                              new LimitsImpl(64),
-                                                                              asList(new ServerConfImpl("ref1",
-                                                                                                        "8080",
-                                                                                                        "https",
-                                                                                                        "some/path"),
-                                                                                     new ServerConfImpl("ref2",
-                                                                                                        "9090/udp",
-                                                                                                        "someprotocol",
-                                                                                                        "/some/path")),
-                                                                              Collections.singletonMap("key1", "value1")),
-                                                                "machineId",
-                                                                "workspaceId",
-                                                                "envName",
-                                                                "userId",
-                                                                MachineStatus.CREATING,
-                                                                null),
-                                                null,
-                                                null,
-                                                null,
-                                                null,
-                                                dockerInstanceStopDetector,
-                                                mock(DockerInstanceProcessesCleaner.class)));
-    }
-
-
-    @Test(expectedExceptions = MachineException.class)
-    public void readFileContentWithNegativeValuesTest() throws MachineException {
-        dockerInstance.readFileContent("filePath", -1, -10);
+        dockerInstance = getDockerInstance();
+        when(dockerConnectorMock.createExec(anyString(),
+                                            anyBoolean(),
+                                            anyVararg())).thenReturn(execMock);
+        doAnswer(invoke -> {
+            @SuppressWarnings("unchecked")
+            MessageProcessor<LogMessage> msgProc = (MessageProcessor<LogMessage>)invoke.getArguments()[1];
+            msgProc.process(logMessageMock);
+            return msgProc;
+        }).when(dockerConnectorMock)
+          .startExec(anyString(), any());
     }
 
     @Test(expectedExceptions = MachineException.class)
-    public void readFileContentWithExecTroubleTest() throws MachineException, ConflictException, IOException {
-        String filePath = "filePath";
-
-        when(dockerConnector.createExec(anyString(), anyBoolean(), Matchers.<String>anyVararg())).thenThrow(new IOException("message"));
-
-        dockerInstance.readFileContent(filePath, -1, 10);
+    public void shouldThrowMachineExceptionWhenStartFromIsNegative() throws Exception {
+        dockerInstance.readFileContent(FILE_PATH, -1, -10);
     }
 
-    @Test(expectedExceptions = MachineException.class, expectedExceptionsMessageRegExp = "File with path filePath not found")
-    public void whenFileNotFoundSedCommandTest() throws MachineException, ConflictException, IOException {
-        String filePath = "filePath";
-        when(logMessage.getContent()).thenReturn("sed: can't read " + filePath + ": No such file or directory");
+    @Test(expectedExceptions = MachineException.class)
+    public void shouldThrowMachineExceptionWhenExecProblemOccurs() throws Exception {
+        when(dockerConnectorMock.createExec(anyString(),
+                                            anyBoolean(),
+                                            anyVararg())).thenThrow(new IOException("File not found"));
 
-        when(dockerConnector.createExec(anyString(), anyBoolean(), Matchers.<String>anyVararg())).thenReturn(exec);
-        doAnswer(invocationOnMock -> {
-            MessageProcessor<LogMessage> processor = (MessageProcessor<LogMessage>)invocationOnMock.getArguments()[1];
-            processor.process(logMessage);
-            return processor;
-        }).when(dockerConnector).startExec(anyString(), any());
-
-        dockerInstance.readFileContent(filePath, 1, 10);
+        dockerInstance.readFileContent(FILE_PATH, -1, 10);
     }
 
-    @Test(expectedExceptions = MachineException.class, expectedExceptionsMessageRegExp = "File with path filePath not found")
-    public void whenFileNotFoundCatCommandTest() throws MachineException, ConflictException, IOException {
-        String filePath = "filePath";
-        when(logMessage.getContent()).thenReturn("cat: " + filePath + ": No such file or directory");
+    @Test(expectedExceptions = MachineException.class,
+          expectedExceptionsMessageRegExp = "File with path " + FILE_PATH + " not found")
+    public void shouldThrowFileNotFoundDuringSedCommand() throws Exception {
+        when(logMessageMock.getContent()).thenReturn("sed: can't read " + FILE_PATH + ": No such file or directory");
 
-        when(dockerConnector.createExec(anyString(), anyBoolean(), Matchers.<String>anyVararg())).thenReturn(exec);
-        doAnswer(invocationOnMock -> {
-            MessageProcessor<LogMessage> processor = (MessageProcessor<LogMessage>)invocationOnMock.getArguments()[1];
-            processor.process(logMessage);
-            return processor;
-        }).when(dockerConnector).startExec(anyString(), any());
+        dockerInstance.readFileContent(FILE_PATH, 1, 10);
+    }
 
-        dockerInstance.readFileContent(filePath, 1, 10);
+    @Test(expectedExceptions = MachineException.class,
+          expectedExceptionsMessageRegExp = "File with path " + FILE_PATH + " not found")
+    public void shouldThrowFileNotFoundDuringCatCommand() throws Exception {
+        when(logMessageMock.getContent()).thenReturn("cat: " + FILE_PATH + ": No such file or directory");
+
+        dockerInstance.readFileContent(FILE_PATH, 1, 10);
     }
 
     @Test
-    public void readFileContentTest() throws MachineException, ConflictException, IOException {
-        String filePath = "filePath";
-        String content = "content";
-        when(logMessage.getContent()).thenReturn(content);
+    public void shouldFullyReadFileContent() throws Exception {
+        final String content = "content";
+        when(logMessageMock.getContent()).thenReturn(content);
 
-        when(dockerConnector.createExec(anyString(), anyBoolean(), Matchers.<String>anyVararg())).thenReturn(exec);
-        doAnswer(invocationOnMock -> {
-            MessageProcessor<LogMessage> processor = (MessageProcessor<LogMessage>)invocationOnMock.getArguments()[1];
-            processor.process(logMessage);
-            return processor;
-        }).when(dockerConnector).startExec(anyString(), any());
+        final String res = dockerInstance.readFileContent(FILE_PATH, 1, 10);
 
-        String result = dockerInstance.readFileContent(filePath, 1, 10);
+        assertEquals(res.trim(), content);
+    }
 
-        assertEquals(result.trim(), content);
+    @Test
+    public void shouldCreateDockerImageLocally() throws Exception {
+        final String digest = "image12";
+        when(dockerConnectorMock.commit(any(CommitParams.class))).thenReturn(digest);
+
+        assertEquals(digest, dockerInstance.saveInLocalImage(OWNER, REPOSITORY, TAG));
+    }
+
+    @Test
+    public void shouldSaveToSnapshotLocalImage() throws Exception {
+        final String digest = "image12";
+        when(dockerConnectorMock.commit(any(CommitParams.class))).thenReturn(digest);
+
+        final InstanceKey result = dockerInstance.saveToSnapshot(OWNER);
+
+        assertEquals(result.getFields().get("tag"), TAG);
+        assertEquals(result.getFields().get("digest"), digest);
+        assertFalse(result.getFields().containsKey("registry"));
+    }
+
+    @Test
+    public void shouldCreateDockerImageInRepository() {
+
+    }
+
+    @Test
+    public void shouldSaveToSnapshotImageFromDockerRepository() {
+
+    }
+
+    private DockerInstance getDockerInstance() {
+        return getDockerInstance(getMachine(), REGISTRY, CONTAINER, IMAGE, true);
+    }
+
+    private DockerInstance getDockerInstance(Machine machine,
+                                             String registry,
+                                             String container,
+                                             String image,
+                                             boolean locallySnapshot) {
+        return new DockerInstance(dockerConnectorMock,
+                                  registry,
+                                  mock(DockerMachineFactory.class),
+                                  machine,
+                                  container,
+                                  image,
+                                  mock(DockerNode.class),
+                                  mock(LineConsumer.class),
+                                  dockerInstanceStopDetectorMock,
+                                  mock(DockerInstanceProcessesCleaner.class),
+                                  locallySnapshot);
+    }
+
+    private Machine getMachine() {
+        return getMachine(getMachineConfig(), OWNER, MACHINE_ID, WORKSPACE_ID, STATUS);
+    }
+
+    private Machine getMachine(MachineConfig config,
+                               String owner,
+                               String machineId,
+                               String wsId,
+                               MachineStatus status) {
+        return MachineImpl.builder()
+                          .setConfig(config)
+                          .setId(machineId)
+                          .setOwner(owner)
+                          .setWorkspaceId(wsId)
+                          .setEnvName("env")
+                          .setStatus(status)
+                          .build();
+    }
+
+    private MachineConfig getMachineConfig() {
+        return getMachineConfig(true, NAME, TYPE);
+    }
+
+    private MachineConfig getMachineConfig(boolean isDev, String name, String type) {
+        return MachineConfigImpl.builder()
+                                .setDev(isDev)
+                                .setName(name)
+                                .setType(type)
+                                .setSource(new MachineSourceImpl("docker", "location"))
+                                .setLimits(new LimitsImpl(64))
+                                .build();
     }
 }
