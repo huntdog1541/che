@@ -1,21 +1,43 @@
-md-select.create-workspace-select
-  width 100%
-  margin-top 0px
-  margin-bottom 0px
+.create-workspace-progress
+  position absolute
+  top 56px
+  z-index 2
 
-.create-workspace-input-with-description
-  margin-bottom -15px
+.create-workspace-toolbar
+  .che-toolbar-header > div:last-child
+    bottom 9px
 
-.create-workspace-input-with-description > span:last-child
-  bottom 15px
-  font-size 12px
-  line-height 12px
-  position relative
-  color $disabled-color
+.create-workspace-header-button .che-button-dropdown
+  button.che-button,
+  .fa-caret-down
+    min-height 36px
+    height 36px
 
-.create-workspace-space-top
-  margin-top 15px
+  .area-dropdown.dropdown-menu
+    top 36px
 
-.create-workspace-members .workspace-members-content
-  padding-left 0px
-  padding-right 0px
+
+md-content.create-workspace-content
+  background-color $very-light-grey-background-color !important
+  overflow auto
+  padding 15px
+
+  .che-label-container-label-name
+    text-transform uppercase
+    color $grey-input-label-color !important
+    font-weight bold !important
+
+  .che-label-container-content
+    min-width 850px
+
+  .create-workspace-content-hidden
+    visibility hidden
+
+  .create-workspace-footer-button
+    width 100%
+
+    button
+      margin 0 !important
+      width 100% !important
+
+

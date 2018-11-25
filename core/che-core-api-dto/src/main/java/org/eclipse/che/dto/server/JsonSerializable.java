@@ -13,16 +13,19 @@
 // limitations under the License.
 package org.eclipse.che.dto.server;
 
-import java.io.Serializable;
-
 import com.google.gson.JsonElement;
+import java.io.Serializable;
+import java.io.Writer;
 
 /** An entity that may serialize itself to JSON. */
 public interface JsonSerializable extends Serializable {
 
-    /** Serializes DTO to JSON format. */
-    String toJson();
+  /** Serializes DTO to JSON format. */
+  String toJson();
 
-    /** Serializes DTO to JSON object. */
-    JsonElement toJsonElement();
+  /** Serialize the DTO to JSON text through the given Writer. */
+  void toJson(Writer w);
+
+  /** Serializes DTO to JSON object. */
+  JsonElement toJsonElement();
 }

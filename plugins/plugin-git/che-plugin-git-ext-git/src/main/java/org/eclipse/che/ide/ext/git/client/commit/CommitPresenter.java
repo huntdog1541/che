@@ -1,312 +1,320 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.git.client.commit;
 
-import com.google.inject.Inject;
-import com.google.inject.Singleton;
-
-import org.eclipse.che.api.core.ErrorCodes;
-import org.eclipse.che.ide.api.git.GitServiceClient;
-import org.eclipse.che.api.git.shared.LogResponse;
-import org.eclipse.che.api.git.shared.Revision;
-import org.eclipse.che.api.workspace.shared.dto.ProjectConfigDto;
-import org.eclipse.che.ide.api.app.AppContext;
-import org.eclipse.che.ide.api.notification.NotificationManager;
-import org.eclipse.che.ide.api.project.node.HasStorablePath;
-import org.eclipse.che.ide.api.selection.Selection;
-import org.eclipse.che.ide.commons.exception.ServerException;
-import org.eclipse.che.ide.ext.git.client.DateTimeFormatter;
-import org.eclipse.che.ide.ext.git.client.GitLocalizationConstant;
-import org.eclipse.che.ide.ext.git.client.outputconsole.GitOutputConsole;
-import org.eclipse.che.ide.ext.git.client.outputconsole.GitOutputConsoleFactory;
-import org.eclipse.che.ide.extension.machine.client.processes.ConsolesPanelPresenter;
-import org.eclipse.che.ide.part.explorer.project.ProjectExplorerPresenter;
-import org.eclipse.che.ide.rest.AsyncRequestCallback;
-import org.eclipse.che.ide.rest.DtoUnmarshallerFactory;
-import org.eclipse.che.ide.rest.Unmarshallable;
-import org.eclipse.che.ide.api.dialogs.ConfirmCallback;
-import org.eclipse.che.ide.api.dialogs.DialogFactory;
-import org.eclipse.che.ide.util.loging.Log;
-import org.eclipse.che.ide.websocket.WebSocketException;
-import org.eclipse.che.ide.websocket.rest.RequestCallback;
-
-import javax.validation.constraints.NotNull;
-import java.util.ArrayList;
-import java.util.List;
-
+import static com.google.common.collect.Iterables.getFirst;
+import static java.util.Arrays.stream;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.joining;
+import static org.eclipse.che.api.git.shared.BranchListMode.LIST_REMOTE;
+import static org.eclipse.che.api.git.shared.DiffType.NAME_STATUS;
 import static org.eclipse.che.ide.api.notification.StatusNotification.DisplayMode.FLOAT_MODE;
 import static org.eclipse.che.ide.api.notification.StatusNotification.DisplayMode.NOT_EMERGE_MODE;
 import static org.eclipse.che.ide.api.notification.StatusNotification.Status.FAIL;
+import static org.eclipse.che.ide.api.notification.StatusNotification.Status.SUCCESS;
+import static org.eclipse.che.ide.resource.Path.valueOf;
 import static org.eclipse.che.ide.util.ExceptionUtils.getErrorCode;
+
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+import javax.validation.constraints.NotNull;
+import org.eclipse.che.api.core.ErrorCodes;
+import org.eclipse.che.api.git.shared.PushResponse;
+import org.eclipse.che.api.git.shared.Revision;
+import org.eclipse.che.api.promises.client.Promise;
+import org.eclipse.che.commons.annotation.Nullable;
+import org.eclipse.che.ide.api.app.AppContext;
+import org.eclipse.che.ide.api.auth.Credentials;
+import org.eclipse.che.ide.api.auth.OAuthServiceClient;
+import org.eclipse.che.ide.api.notification.NotificationManager;
+import org.eclipse.che.ide.api.resources.Project;
+import org.eclipse.che.ide.commons.exception.ServerException;
+import org.eclipse.che.ide.ext.git.client.DateTimeFormatter;
+import org.eclipse.che.ide.ext.git.client.GitAuthActionPresenter;
+import org.eclipse.che.ide.ext.git.client.GitLocalizationConstant;
+import org.eclipse.che.ide.ext.git.client.GitServiceClient;
+import org.eclipse.che.ide.ext.git.client.compare.AlteredFiles;
+import org.eclipse.che.ide.ext.git.client.compare.selectablechangespanel.SelectableChangesPanelPresenter;
+import org.eclipse.che.ide.ext.git.client.compare.selectablechangespanel.SelectionCallBack;
+import org.eclipse.che.ide.ext.git.client.outputconsole.GitOutputConsole;
+import org.eclipse.che.ide.ext.git.client.outputconsole.GitOutputConsoleFactory;
+import org.eclipse.che.ide.processes.panel.ProcessesPanelPresenter;
+import org.eclipse.che.ide.resource.Path;
+import org.eclipse.che.ide.ui.dialogs.DialogFactory;
 
 /**
  * Presenter for commit changes on git.
  *
  * @author Ann Zhuleva
+ * @author Vlad Zhukovskyi
+ * @author Igor Vinokur
  */
 @Singleton
-public class CommitPresenter implements CommitView.ActionDelegate {
-    public static final String COMMIT_COMMAND_NAME = "Git commit";
+public class CommitPresenter extends GitAuthActionPresenter
+    implements CommitView.ActionDelegate, SelectionCallBack {
+  private static final String COMMIT_COMMAND_NAME = "Git commit";
 
-    private final DialogFactory            dialogFactory;
-    private final DtoUnmarshallerFactory   dtoUnmarshallerFactory;
-    private final AppContext               appContext;
-    private final CommitView               view;
-    private final GitServiceClient         service;
-    private final GitLocalizationConstant  constant;
-    private final NotificationManager      notificationManager;
-    private final DateTimeFormatter        dateTimeFormatter;
-    private final GitOutputConsoleFactory  gitOutputConsoleFactory;
-    private final ConsolesPanelPresenter   consolesPanelPresenter;
-    private final ProjectExplorerPresenter projectExplorer;
+  private final SelectableChangesPanelPresenter selectableChangesPanelPresenter;
+  private final DialogFactory dialogFactory;
+  private final AppContext appContext;
+  private final CommitView view;
+  private final GitServiceClient service;
+  private final DateTimeFormatter dateTimeFormatter;
+  private final GitOutputConsoleFactory gitOutputConsoleFactory;
+  private final ProcessesPanelPresenter consolesPanelPresenter;
 
-    @Inject
-    public CommitPresenter(CommitView view,
-                           GitServiceClient service,
-                           GitLocalizationConstant constant,
-                           NotificationManager notificationManager,
-                           DialogFactory dialogFactory,
-                           DtoUnmarshallerFactory dtoUnmarshallerFactory,
-                           AppContext appContext,
-                           DateTimeFormatter dateTimeFormatter,
-                           ProjectExplorerPresenter projectExplorer,
-                           GitOutputConsoleFactory gitOutputConsoleFactory,
-                           ConsolesPanelPresenter consolesPanelPresenter) {
-        this.view = view;
-        this.dialogFactory = dialogFactory;
-        this.dtoUnmarshallerFactory = dtoUnmarshallerFactory;
-        this.appContext = appContext;
-        this.dateTimeFormatter = dateTimeFormatter;
-        this.gitOutputConsoleFactory = gitOutputConsoleFactory;
-        this.consolesPanelPresenter = consolesPanelPresenter;
-        this.view.setDelegate(this);
-        this.service = service;
-        this.constant = constant;
-        this.notificationManager = notificationManager;
-        this.projectExplorer = projectExplorer;
+  private Project project;
+  private String latestCommitMessage;
+
+  @Inject
+  public CommitPresenter(
+      CommitView view,
+      GitServiceClient service,
+      SelectableChangesPanelPresenter selectableChangesPanelPresenter,
+      GitLocalizationConstant constant,
+      NotificationManager notificationManager,
+      DialogFactory dialogFactory,
+      AppContext appContext,
+      DateTimeFormatter dateTimeFormatter,
+      GitOutputConsoleFactory gitOutputConsoleFactory,
+      ProcessesPanelPresenter processesPanelPresenter,
+      OAuthServiceClient oAuthServiceClient) {
+    super(notificationManager, constant, oAuthServiceClient);
+    this.view = view;
+    this.selectableChangesPanelPresenter = selectableChangesPanelPresenter;
+    this.dialogFactory = dialogFactory;
+    this.appContext = appContext;
+    this.dateTimeFormatter = dateTimeFormatter;
+    this.gitOutputConsoleFactory = gitOutputConsoleFactory;
+    this.consolesPanelPresenter = processesPanelPresenter;
+    this.view.setDelegate(this);
+    this.service = service;
+    this.view.setChangesPanelView(selectableChangesPanelPresenter.getView());
+  }
+
+  public void showDialog(Project project) {
+    this.project = project;
+
+    view.setValueToAmendCheckBox(false);
+    view.setValueToPushAfterCommitCheckBox(false);
+    view.setEnableAmendCheckBox(true);
+    view.setEnablePushAfterCommitCheckBox(true);
+    view.setEnableRemoteBranchesDropDownLis(false);
+    service
+        .diff(project.getLocation(), null, NAME_STATUS, true, 0, "HEAD", false)
+        .then(
+            diff -> {
+              service
+                  .log(project.getLocation(), null, -1, 1, false)
+                  .then(
+                      log -> {
+                        final Revision revision = getFirst(log.getCommits(), null);
+                        if (revision != null) {
+                          latestCommitMessage = revision.getMessage();
+                        }
+                        if (diff.isEmpty()) {
+                          showAskForAmendDialog();
+                        } else {
+                          show(diff);
+                        }
+                      })
+                  .catchError(
+                      error -> {
+                        if (getErrorCode(error.getCause())
+                            == ErrorCodes.INIT_COMMIT_WAS_NOT_PERFORMED) {
+                          service
+                              .getStatus(project.getLocation(), emptyList())
+                              .then(
+                                  status -> {
+                                    view.setEnableAmendCheckBox(false);
+                                    view.setEnablePushAfterCommitCheckBox(false);
+                                    List<String> newFiles = new ArrayList<>();
+                                    newFiles.addAll(status.getAdded());
+                                    newFiles.addAll(status.getUntracked());
+                                    show(newFiles.stream().collect(joining("\nA\t", "A\t", "")));
+                                  });
+                        } else {
+                          notificationManager.notify(locale.logFailed(), FAIL, NOT_EMERGE_MODE);
+                        }
+                      });
+            })
+        .catchError(
+            arg -> {
+              notificationManager.notify(locale.diffFailed(), FAIL, FLOAT_MODE);
+            });
+
+    service
+        .branchList(project.getLocation(), LIST_REMOTE)
+        .then(view::setRemoteBranchesList)
+        .catchError(
+            error -> {
+              notificationManager.notify(locale.branchesListFailed(), FAIL, FLOAT_MODE);
+            });
+  }
+
+  private void showAskForAmendDialog() {
+    dialogFactory
+        .createConfirmDialog(
+            locale.commitTitle(),
+            locale.commitNothingToCommitMessageText(),
+            locale.buttonYes(),
+            locale.buttonNo(),
+            () -> {
+              view.setValueToAmendCheckBox(true);
+              view.setEnablePushAfterCommitCheckBox(false);
+              setAmendCommitMessage();
+              show(null);
+            },
+            null)
+        .show();
+  }
+
+  private void show(@Nullable String diff) {
+    AlteredFiles alteredFiles = new AlteredFiles(project, diff);
+
+    view.setEnableCommitButton(!view.getCommitMessage().isEmpty());
+    view.focusInMessageField();
+    view.showDialog();
+    selectableChangesPanelPresenter.show(alteredFiles, this);
+    selectableChangesPanelPresenter.setMarkedCheckBoxes(
+        stream(appContext.getResources())
+            .map(resource -> resource.getLocation().removeFirstSegments(1))
+            .collect(Collectors.toSet()));
+  }
+
+  @Override
+  public void onCommitClicked() {
+    Path location = project.getLocation();
+    Path[] filesToCommitArray = getFilesToCommit();
+
+    service
+        .add(location, false, filesToCommitArray)
+        .then(
+            arg -> {
+              service
+                  .commit(location, view.getCommitMessage(), view.isAmend(), filesToCommitArray)
+                  .then(
+                      revision -> {
+                        onCommitSuccess(revision);
+                        if (view.isPushAfterCommit()) {
+                          push(location);
+                        }
+                        view.close();
+                      })
+                  .catchError(
+                      error -> {
+                        handleError(error.getCause());
+                      });
+            })
+        .catchError(
+            error -> {
+              notificationManager.notify(locale.addFailed(), FAIL, FLOAT_MODE);
+            });
+  }
+
+  private Path[] getFilesToCommit() {
+    List<String> selectedFiles = selectableChangesPanelPresenter.getSelectedFiles();
+    int selectedFilesSize = selectedFiles.size();
+    Path[] filesToCommit = new Path[selectedFilesSize];
+    for (int i = 0; i < selectedFilesSize; i++) {
+      filesToCommit[i] = valueOf(selectedFiles.get(i));
     }
+    return filesToCommit;
+  }
 
-    /** Show dialog. */
-    public void showDialog() {
-        view.setAmend(false);
-        view.setAllFilesInclude(false);
-        view.setIncludeSelection(false);
-        view.setOnlySelection(false);
-        view.setEnableCommitButton(!view.getMessage().isEmpty());
-        view.showDialog();
-        view.focusInMessageField();
+  private void push(Path location) {
+    String remoteBranch = view.getRemoteBranch();
+    String remote = remoteBranch.split("/")[0];
+    String branch = remoteBranch.split("/")[1];
+    performOperationWithTokenRequestIfNeeded(
+            new RemoteGitOperation<PushResponse>() {
+              @Override
+              public Promise<PushResponse> perform(Credentials credentials) {
+                return service.push(location, singletonList(branch), remote, false, credentials);
+              }
+            })
+        .then(
+            result -> {
+              notificationManager.notify(locale.pushSuccess(remote), SUCCESS, FLOAT_MODE);
+            })
+        .catchError(
+            error -> {
+              notificationManager.notify(locale.pushFail(), FAIL, FLOAT_MODE);
+            });
+  }
+
+  @Override
+  public void onCancelClicked() {
+    view.close();
+  }
+
+  @Override
+  public void onValueChanged() {
+    view.setEnableCommitButton(
+        !view.getCommitMessage().isEmpty()
+            && (!selectableChangesPanelPresenter.getSelectedFiles().isEmpty() || view.isAmend()));
+  }
+
+  @Override
+  public void onSelectionChanged(Path path, boolean isChecked) {
+    onValueChanged();
+  }
+
+  @Override
+  public void setAmendCommitMessage() {
+    if (latestCommitMessage == null) {
+      return;
     }
+    view.setMessage(latestCommitMessage);
+    view.setEnableCommitButton(!latestCommitMessage.isEmpty());
+  }
 
-    /** {@inheritDoc} */
-    @Override
-    public void onCommitClicked() {
-        final String message = view.getMessage();
-        final boolean all = view.isAllFilesInclued();
-        final boolean amend = view.isAmend();
-        final boolean selectionFlag = this.view.isIncludeSelection();
-        final boolean onlySelectionFlag = this.view.isOnlySelection();
+  private void onCommitSuccess(@NotNull final Revision revision) {
+    String date = dateTimeFormatter.getFormattedDate(revision.getCommitTime());
+    String message = locale.commitMessage(revision.getId(), date);
 
-        if (selectionFlag) {
-            commitAddSelection(message, amend);
-        } else if (onlySelectionFlag) {
-            commitOnlySelection(message, amend);
-        } else {
-            doCommit(message, all, amend);
-        }
-
+    if ((revision.getCommitter() != null
+        && revision.getCommitter().getName() != null
+        && !revision.getCommitter().getName().isEmpty())) {
+      message += " " + locale.commitUser(revision.getCommitter().getName());
     }
+    GitOutputConsole console = gitOutputConsoleFactory.create(COMMIT_COMMAND_NAME);
+    console.print(message);
+    consolesPanelPresenter.addCommandOutput(console);
+    notificationManager.notify(message);
+    view.setMessage("");
+  }
 
-    private void commitAddSelection(final String message, final boolean amend) {
-        // first git-add the selection
-        @SuppressWarnings("unchecked")
-        final Selection<HasStorablePath> selection = (Selection<HasStorablePath>)this.projectExplorer.getSelection();
-        if (selection.isEmpty() || !(selection.getHeadElement() instanceof HasStorablePath)) {
-            doCommit(message, false, amend);
-        } else {
-            final List<String> filePattern = buildFileList(selection);
-
-            try {
-                service.add(appContext.getDevMachine(), appContext.getCurrentProject().getRootProject(), false, filePattern, new RequestCallback<Void>() {
-                    @Override
-                    protected void onSuccess(final Void result) {
-                        // then commit
-                        doCommit(message, false, amend);
-                    }
-
-                    @Override
-                    protected void onFailure(final Throwable exception) {
-                        handleError(exception);
-                    }
-                });
-            } catch (final WebSocketException e) {
-                handleError(new Exception("Communication error with the server", e));
-            }
-        }
+  private void handleError(@NotNull Throwable exception) {
+    if (exception instanceof ServerException
+        && ((ServerException) exception).getErrorCode()
+            == ErrorCodes.NO_COMMITTER_NAME_OR_EMAIL_DEFINED) {
+      dialogFactory
+          .createMessageDialog(locale.commitTitle(), locale.committerIdentityInfoEmpty(), null)
+          .show();
+      return;
     }
-
-    private List<String> buildFileList(final Selection<HasStorablePath> selection) {
-        final List<String> filePattern = new ArrayList<>();
-        final List<HasStorablePath> selected = selection.getAllElements();
-        final String base = appContext.getCurrentProject().getRootProject().getPath();
-        for (final HasStorablePath node : selected) {
-            filePattern.add(getPath(node, base));
-        }
-        return filePattern;
-    }
-
-    private void commitOnlySelection(final String message, final boolean amend) {
-        // first git-add the selection
-        @SuppressWarnings("unchecked")
-        final Selection<HasStorablePath> selection = (Selection<HasStorablePath>)this.projectExplorer.getSelection();
-        if (selection != null && !selection.isEmpty() && (selection.getHeadElement() != null)) {
-            final List<String> files = buildFileList(selection);
-            service.commit(appContext.getDevMachine(), appContext.getCurrentProject().getRootProject(), message, files, amend,
-                           new AsyncRequestCallback<Revision>(dtoUnmarshallerFactory.newUnmarshaller(Revision.class)) {
-                               @Override
-                               protected void onSuccess(final Revision result) {
-                                   onCommitSuccess(result);
-                               }
-
-                               @Override
-                               protected void onFailure(final Throwable exception) {
-                                   handleError(exception);
-                               }
-                           }
-                          );
-        } // else don't commit as it goes against user intent
-        this.view.close();
-    }
-
-    private void doCommit(final String message, final boolean all, final boolean amend) {
-        service.commit(appContext.getDevMachine(), appContext.getCurrentProject().getRootProject(), message, all, amend,
-                       new AsyncRequestCallback<Revision>(dtoUnmarshallerFactory.newUnmarshaller(Revision.class)) {
-                           @Override
-                           protected void onSuccess(final Revision result) {
-                               onCommitSuccess(result);
-                           }
-
-                           @Override
-                           protected void onFailure(final Throwable exception) {
-                               handleError(exception);
-                           }
-                       }
-                      );
-        this.view.close();
-    }
-
-    private String getPath(final HasStorablePath node, final String base) {
-        String path = node.getStorablePath();
-        if (path.startsWith(base)) {
-            path = path.replaceFirst(base, "");
-        }
-        if (path.startsWith("/")) {
-            path = path.replaceFirst("/", "");
-        }
-        if (path.isEmpty() || "/".equals(path)) {
-            path = ".";
-        }
-        return path;
-    }
-
-    /**
-     * Performs action when commit is successfully completed.
-     *
-     * @param revision
-     *         a {@link Revision}
-     */
-    private void onCommitSuccess(@NotNull final Revision revision) {
-        String date = dateTimeFormatter.getFormattedDate(revision.getCommitTime());
-        String message = constant.commitMessage(revision.getId(), date);
-
-        if ((revision.getCommitter() != null && revision.getCommitter().getName() != null &&
-             !revision.getCommitter().getName().isEmpty())) {
-            message += " " + constant.commitUser(revision.getCommitter().getName());
-        }
-        GitOutputConsole console = gitOutputConsoleFactory.create(COMMIT_COMMAND_NAME);
-        console.print(message);
-        consolesPanelPresenter.addCommandOutput(appContext.getDevMachine().getId(), console);
-        notificationManager.notify(message, appContext.getCurrentProject().getRootProject());
-        view.setMessage("");
-    }
-
-    /**
-     * Handler some action whether some exception happened.
-     *
-     * @param exception
-     *         exception that happened
-     */
-    private void handleError(@NotNull Throwable exception) {
-        if (exception instanceof ServerException &&
-            ((ServerException)exception).getErrorCode() == ErrorCodes.NO_COMMITTER_NAME_OR_EMAIL_DEFINED) {
-            dialogFactory.createMessageDialog(constant.commitTitle(), constant.committerIdentityInfoEmpty(), new ConfirmCallback() {
-                @Override
-                public void accepted() {
-                    //do nothing
-                }
-            }).show();
-            return;
-        }
-        String exceptionMessage = exception.getMessage();
-        String errorMessage = (exceptionMessage != null && !exceptionMessage.isEmpty()) ? exceptionMessage : constant.commitFailed();
-        GitOutputConsole console = gitOutputConsoleFactory.create(COMMIT_COMMAND_NAME);
-        console.printError(errorMessage);
-        consolesPanelPresenter.addCommandOutput(appContext.getDevMachine().getId(), console);
-        notificationManager.notify(constant.commitFailed(), errorMessage, FAIL, FLOAT_MODE, appContext.getCurrentProject().getRootProject());
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void onCancelClicked() {
-        view.close();
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void onValueChanged() {
-        String message = view.getMessage();
-        view.setEnableCommitButton(!message.isEmpty());
-    }
-
-    @Override
-    public void setAmendCommitMessage() {
-        final ProjectConfigDto project = appContext.getCurrentProject().getRootProject();
-        final Unmarshallable<LogResponse> unmarshall = dtoUnmarshallerFactory.newUnmarshaller(LogResponse.class);
-        this.service.log(appContext.getDevMachine(), project, null, false,
-                         new AsyncRequestCallback<LogResponse>(unmarshall) {
-                             @Override
-                             protected void onSuccess(final LogResponse result) {
-                                 final List<Revision> commits = result.getCommits();
-                                 String message = "";
-                                 if (commits != null && (!commits.isEmpty())) {
-                                     final Revision tip = commits.get(0);
-                                     if (tip != null) {
-                                         message = tip.getMessage();
-                                     }
-                                 }
-                                 CommitPresenter.this.view.setMessage(message);
-                                 CommitPresenter.this.view.setEnableCommitButton(!message.isEmpty());
-                             }
-
-                             @Override
-                             protected void onFailure(final Throwable exception) {
-                                 if (getErrorCode(exception) == ErrorCodes.INIT_COMMIT_WAS_NOT_PERFORMED) {
-                                     dialogFactory.createMessageDialog(constant.commitTitle(),
-                                                                       constant.initCommitWasNotPerformed(),
-                                                                       null).show();
-                                 } else {
-                                     Log.warn(CommitPresenter.class, "Git log failed", exception);
-                                     CommitPresenter.this.view.setMessage("");
-                                     notificationManager.notify(constant.logFailed(), FAIL, NOT_EMERGE_MODE, project);
-                                 }
-                             }
-                         });
-    }
+    String exceptionMessage = exception.getMessage();
+    String errorMessage =
+        (exceptionMessage != null && !exceptionMessage.isEmpty())
+            ? exceptionMessage
+            : locale.commitFailed();
+    GitOutputConsole console = gitOutputConsoleFactory.create(COMMIT_COMMAND_NAME);
+    console.printError(errorMessage);
+    consolesPanelPresenter.addCommandOutput(console);
+    notificationManager.notify(locale.commitFailed(), errorMessage, FAIL, FLOAT_MODE);
+  }
 }

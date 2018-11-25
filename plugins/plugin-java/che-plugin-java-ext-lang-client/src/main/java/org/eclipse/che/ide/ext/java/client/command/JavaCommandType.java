@@ -1,34 +1,30 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.java.client.command;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-
+import java.util.LinkedList;
+import java.util.List;
+import org.eclipse.che.ide.api.command.CommandPage;
+import org.eclipse.che.ide.api.command.CommandType;
 import org.eclipse.che.ide.api.icon.Icon;
 import org.eclipse.che.ide.api.icon.IconRegistry;
+import org.eclipse.che.ide.ext.java.client.JavaLocalizationConstant;
 import org.eclipse.che.ide.ext.java.client.JavaResources;
-import org.eclipse.che.ide.ext.java.client.command.valueproviders.ClasspathProvider;
-import org.eclipse.che.ide.ext.java.client.command.valueproviders.OutputDirProvider;
-import org.eclipse.che.ide.ext.java.client.command.valueproviders.SourcepathProvider;
-import org.eclipse.che.ide.extension.machine.client.command.CommandConfiguration;
-import org.eclipse.che.ide.extension.machine.client.command.CommandConfigurationFactory;
-import org.eclipse.che.ide.extension.machine.client.command.CommandConfigurationPage;
-import org.eclipse.che.ide.extension.machine.client.command.CommandType;
-import org.eclipse.che.ide.extension.machine.client.command.valueproviders.CurrentProjectPathProvider;
-import org.vectomatic.dom.svg.ui.SVGResource;
-
-import javax.validation.constraints.NotNull;
-import java.util.Collection;
-import java.util.LinkedList;
+import org.eclipse.che.ide.ext.java.client.command.valueproviders.ClasspathMacro;
+import org.eclipse.che.ide.ext.java.client.command.valueproviders.OutputDirMacro;
+import org.eclipse.che.ide.ext.java.client.command.valueproviders.SourcepathMacro;
+import org.eclipse.che.ide.macro.CurrentProjectPathMacro;
 
 /**
  * Java command type.
@@ -38,81 +34,76 @@ import java.util.LinkedList;
 @Singleton
 public class JavaCommandType implements CommandType {
 
-    private static final String ID               = "java";
-    private static final String DISPLAY_NAME     = "Java";
+  private static final String ID = "java";
 
-    private final JavaResources                                                        resources;
-    private final CurrentProjectPathProvider                                           currentProjectPathProvider;
-    private final SourcepathProvider                                                   sourcepathProvider;
-    private final OutputDirProvider                                                    outputDirProvider;
-    private final ClasspathProvider classpathProvider;
-    private final JavaCommandConfigurationFactory                                      configurationFactory;
-    private final Collection<CommandConfigurationPage<? extends CommandConfiguration>> pages;
+  private final CurrentProjectPathMacro currentProjectPathMacro;
+  private final SourcepathMacro sourcepathMacro;
+  private final OutputDirMacro outputDirMacro;
+  private final ClasspathMacro classpathMacro;
+  private final JavaLocalizationConstant localizationConstants;
+  private final List<CommandPage> pages;
 
-    @Inject
-    public JavaCommandType(JavaResources resources,
-                           JavaCommandPagePresenter page,
-                           CurrentProjectPathProvider currentProjectPathProvider,
-                           SourcepathProvider sourcepathProvider,
-                           OutputDirProvider outputDirProvider,
-                           ClasspathProvider classpathProvider,
-                           IconRegistry iconRegistry) {
-        this.resources = resources;
-        this.currentProjectPathProvider = currentProjectPathProvider;
-        this.sourcepathProvider = sourcepathProvider;
-        this.outputDirProvider = outputDirProvider;
-        this.classpathProvider = classpathProvider;
-        configurationFactory = new JavaCommandConfigurationFactory(this);
-        pages = new LinkedList<>();
-        pages.add(page);
+  @Inject
+  public JavaCommandType(
+      JavaResources resources,
+      JavaCommandPagePresenter page,
+      CurrentProjectPathMacro currentProjectPathMacro,
+      SourcepathMacro sourcepathMacro,
+      OutputDirMacro outputDirMacro,
+      ClasspathMacro classpathMacro,
+      IconRegistry iconRegistry,
+      JavaLocalizationConstant localizationConstants) {
+    this.currentProjectPathMacro = currentProjectPathMacro;
+    this.sourcepathMacro = sourcepathMacro;
+    this.outputDirMacro = outputDirMacro;
+    this.classpathMacro = classpathMacro;
+    this.localizationConstants = localizationConstants;
+    pages = new LinkedList<>();
+    pages.add(page);
 
-        iconRegistry.registerIcon(new Icon(ID + ".commands.category.icon", resources.javaCategoryIcon()));
-    }
+    iconRegistry.registerIcon(new Icon("command.type." + ID, resources.javaCategoryIcon()));
+  }
 
-    @NotNull
-    @Override
-    public String getId() {
-        return ID;
-    }
+  @Override
+  public String getId() {
+    return ID;
+  }
 
-    @NotNull
-    @Override
-    public String getDisplayName() {
-        return DISPLAY_NAME;
-    }
+  @Override
+  public String getDisplayName() {
+    return "Java";
+  }
 
-    @NotNull
-    @Override
-    public SVGResource getIcon() {
-        return resources.javaCategoryIcon();
-    }
+  @Override
+  public String getDescription() {
+    return localizationConstants.commandLineDescription();
+  }
 
-    @NotNull
-    @Override
-    public Collection<CommandConfigurationPage<? extends CommandConfiguration>> getConfigurationPages() {
-        return pages;
-    }
+  @Override
+  public List<CommandPage> getPages() {
+    return pages;
+  }
 
-    @NotNull
-    @Override
-    public CommandConfigurationFactory<JavaCommandConfiguration> getConfigurationFactory() {
-        return configurationFactory;
-    }
+  @Override
+  public String getCommandLineTemplate() {
 
-    @NotNull
-    @Override
-    public String getCommandTemplate() {
-        return "cd " + currentProjectPathProvider.getKey() +
-               " && javac -classpath " + classpathProvider.getKey() +
-               " -sourcepath " + sourcepathProvider.getKey() +
-               " -d " + outputDirProvider.getKey() +
-               " src/com/company/Main.java" +
-               " && java -classpath " + classpathProvider.getKey() + outputDirProvider.getKey() +
-               " com.company.Main";
-    }
+    return "cd "
+        + currentProjectPathMacro.getName()
+        + "\njavac -classpath "
+        + classpathMacro.getName()
+        + " -sourcepath "
+        + sourcepathMacro.getName()
+        + " -d "
+        + outputDirMacro.getName()
+        + " src/Main.java"
+        + "\njava -classpath "
+        + classpathMacro.getName()
+        + outputDirMacro.getName()
+        + " Main";
+  }
 
-    @Override
-    public String getPreviewUrlTemplate() {
-        return "";
-    }
+  @Override
+  public String getPreviewUrlTemplate() {
+    return "";
+  }
 }

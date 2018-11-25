@@ -1,471 +1,421 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.git;
-
-import org.eclipse.che.api.core.ServerException;
-import org.eclipse.che.api.core.UnauthorizedException;
-import org.eclipse.che.api.core.util.LineConsumerFactory;
-import org.eclipse.che.api.git.shared.AddRequest;
-import org.eclipse.che.api.git.shared.Branch;
-import org.eclipse.che.api.git.shared.CheckoutRequest;
-import org.eclipse.che.api.git.shared.BranchCreateRequest;
-import org.eclipse.che.api.git.shared.BranchDeleteRequest;
-import org.eclipse.che.api.git.shared.BranchListRequest;
-import org.eclipse.che.api.git.shared.CloneRequest;
-import org.eclipse.che.api.git.shared.CommitRequest;
-import org.eclipse.che.api.git.shared.DiffRequest;
-import org.eclipse.che.api.git.shared.FetchRequest;
-import org.eclipse.che.api.git.shared.GitUser;
-import org.eclipse.che.api.git.shared.InitRequest;
-import org.eclipse.che.api.git.shared.LogRequest;
-import org.eclipse.che.api.git.shared.LsFilesRequest;
-import org.eclipse.che.api.git.shared.LsRemoteRequest;
-import org.eclipse.che.api.git.shared.MergeRequest;
-import org.eclipse.che.api.git.shared.MergeResult;
-import org.eclipse.che.api.git.shared.MoveRequest;
-import org.eclipse.che.api.git.shared.PullRequest;
-import org.eclipse.che.api.git.shared.PullResponse;
-import org.eclipse.che.api.git.shared.PushRequest;
-import org.eclipse.che.api.git.shared.PushResponse;
-import org.eclipse.che.api.git.shared.Remote;
-import org.eclipse.che.api.git.shared.RemoteAddRequest;
-import org.eclipse.che.api.git.shared.RemoteListRequest;
-import org.eclipse.che.api.git.shared.RemoteReference;
-import org.eclipse.che.api.git.shared.RemoteUpdateRequest;
-import org.eclipse.che.api.git.shared.ResetRequest;
-import org.eclipse.che.api.git.shared.RebaseRequest;
-import org.eclipse.che.api.git.shared.RebaseResponse;
-import org.eclipse.che.api.git.shared.Revision;
-import org.eclipse.che.api.git.shared.RmRequest;
-import org.eclipse.che.api.git.shared.ShowFileContentRequest;
-import org.eclipse.che.api.git.shared.ShowFileContentResponse;
-import org.eclipse.che.api.git.shared.Status;
-import org.eclipse.che.api.git.shared.StatusFormat;
-import org.eclipse.che.api.git.shared.Tag;
-import org.eclipse.che.api.git.shared.TagCreateRequest;
-import org.eclipse.che.api.git.shared.TagDeleteRequest;
-import org.eclipse.che.api.git.shared.TagListRequest;
 
 import java.io.Closeable;
 import java.io.File;
 import java.net.URISyntaxException;
 import java.util.List;
+import org.eclipse.che.api.core.ServerException;
+import org.eclipse.che.api.core.UnauthorizedException;
+import org.eclipse.che.api.core.util.LineConsumerFactory;
+import org.eclipse.che.api.git.exception.GitException;
+import org.eclipse.che.api.git.params.AddParams;
+import org.eclipse.che.api.git.params.CheckoutParams;
+import org.eclipse.che.api.git.params.CloneParams;
+import org.eclipse.che.api.git.params.CommitParams;
+import org.eclipse.che.api.git.params.DiffParams;
+import org.eclipse.che.api.git.params.FetchParams;
+import org.eclipse.che.api.git.params.LogParams;
+import org.eclipse.che.api.git.params.LsFilesParams;
+import org.eclipse.che.api.git.params.PullParams;
+import org.eclipse.che.api.git.params.PushParams;
+import org.eclipse.che.api.git.params.RemoteAddParams;
+import org.eclipse.che.api.git.params.RemoteUpdateParams;
+import org.eclipse.che.api.git.params.ResetParams;
+import org.eclipse.che.api.git.params.RmParams;
+import org.eclipse.che.api.git.params.TagCreateParams;
+import org.eclipse.che.api.git.shared.Branch;
+import org.eclipse.che.api.git.shared.BranchListMode;
+import org.eclipse.che.api.git.shared.EditedRegion;
+import org.eclipse.che.api.git.shared.GitUser;
+import org.eclipse.che.api.git.shared.MergeResult;
+import org.eclipse.che.api.git.shared.PullResponse;
+import org.eclipse.che.api.git.shared.PushResponse;
+import org.eclipse.che.api.git.shared.RebaseResponse;
+import org.eclipse.che.api.git.shared.Remote;
+import org.eclipse.che.api.git.shared.RemoteReference;
+import org.eclipse.che.api.git.shared.RevertResult;
+import org.eclipse.che.api.git.shared.Revision;
+import org.eclipse.che.api.git.shared.ShowFileContentResponse;
+import org.eclipse.che.api.git.shared.Status;
+import org.eclipse.che.api.git.shared.Tag;
 
 /**
  * Connection to Git repository.
  *
  * @author andrew00x
+ * @author Igor Vinokur
  */
 public interface GitConnection extends Closeable {
-    File getWorkingDir();
+  File getWorkingDir();
 
-    /**
-     * Add content of working tree to Git index. This action prepares content to next commit.
-     *
-     * @param request
-     *         add request
-     * @throws GitException
-     *         if any error occurs when add files to the index
-     * @see AddRequest
-     */
-    void add(AddRequest request) throws GitException;
+  /**
+   * Add content of working tree to Git index. This action prepares content to next commit.
+   *
+   * @param params add params
+   * @throws GitException if any error occurs when add files to the index
+   * @see AddParams
+   */
+  void add(AddParams params) throws GitException;
 
-    /**
-     * Checkout a branch / file to the working tree.
-     *
-     * @param request
-     *         checkout request
-     * @throws GitException
-     *         if any error occurs when checkout
-     * @see CheckoutRequest
-     */
-    void checkout(CheckoutRequest request) throws GitException;
+  /**
+   * Checkout a branch / file to the working tree.
+   *
+   * @param params checkout params
+   * @throws GitException if any error occurs when checkout
+   * @see CheckoutParams
+   */
+  void checkout(CheckoutParams params) throws GitException;
 
-    /**
-     * Create new branch.
-     *
-     * @param request
-     *         create branch request
-     * @return newly created branch
-     * @throws GitException
-     *         if any error occurs when create branch
-     * @see BranchCreateRequest
-     */
-    Branch branchCreate(BranchCreateRequest request) throws GitException;
+  /**
+   * Create new branch.
+   *
+   * @param name name of the branch to create
+   * @param startPoint hash commit from which to start new branch. If <code>null</code> HEAD will be
+   *     used
+   * @return newly created branch
+   * @throws GitException if any error occurs when creating branch
+   */
+  Branch branchCreate(String name, String startPoint) throws GitException;
 
-    /**
-     * Delete branch.
-     *
-     * @param request
-     *         delete branch request
-     * @throws GitException
-     *         if any error occurs when delete branch
-     * @see BranchDeleteRequest
-     */
-    void branchDelete(BranchDeleteRequest request) throws GitException, UnauthorizedException;
+  /**
+   * Delete branch.
+   *
+   * @param name name of the branch to delete
+   * @param force <code>true</code> if need to delete branch with force
+   * @throws UnauthorizedException if it is not possible to delete remote branch with existing
+   *     credentials
+   * @throws GitException if any other error occurs
+   */
+  void branchDelete(String name, boolean force) throws GitException, UnauthorizedException;
 
-    /**
-     * Rename branch.
-     *
-     * @param oldName
-     *         current name of branch
-     * @param newName
-     *         new name of branch
-     * @throws GitException
-     *         if any error occurs when delete branch
-     */
-    void branchRename(String oldName, String newName) throws GitException, UnauthorizedException;
+  /**
+   * Rename branch.
+   *
+   * @param oldName current name of branch
+   * @param newName new name of branch
+   * @throws UnauthorizedException if it is not possible to rename remote branch with existing
+   *     credentials
+   * @throws GitException if any other error occurs
+   */
+  void branchRename(String oldName, String newName) throws GitException, UnauthorizedException;
 
-    /**
-     * List branches.
-     *
-     * @param request
-     *         list branches request
-     * @return list of branch
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         if {@link BranchListRequest#getListMode()} returns not <code>null</code> or 'a' or 'r'
-     * @see BranchListRequest
-     */
-    List<Branch> branchList(BranchListRequest request) throws GitException;
+  /**
+   * List branches.
+   *
+   * @param listMode specifies what branches to list. {@link BranchListMode#LIST_ALL} will be set if
+   *     parameter is not specified
+   * @throws GitException if any error occurs
+   */
+  List<Branch> branchList(BranchListMode listMode) throws GitException;
 
-    /**
-     * Show information about files in the index and the working tree
-     *
-     * @param request
-     *         list files request
-     * @return list of files.
-     * @throws GitException
-     *         if any error occurs
-     */
-    List<String> listFiles(LsFilesRequest request) throws GitException;
+  /**
+   * Show information about files in the index and the working tree.
+   *
+   * @param params list files params
+   * @return list of files.
+   * @throws GitException if any error occurs
+   */
+  List<String> listFiles(LsFilesParams params) throws GitException;
 
-    /**
-     * Clone repository.
-     *
-     * @param request
-     *         clone request
-     * @throws URISyntaxException
-     *         if {@link CloneRequest#getRemoteUri()} return invalid value
-     * @throws GitException
-     *         if any other error occurs
-     * @see CloneRequest
-     */
-    void clone(CloneRequest request) throws URISyntaxException, ServerException, UnauthorizedException;
+  /**
+   * Clone repository.
+   *
+   * @param params clone params
+   * @throws UnauthorizedException if it is not possible to clone with existing credentials
+   * @throws GitException if any other error occurs
+   * @see CloneParams
+   */
+  void clone(CloneParams params) throws URISyntaxException, ServerException, UnauthorizedException;
 
-    /**
-     * Commit current state of index in new commit.
-     *
-     * @param request
-     *         commit request
-     * @return new commit
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         if {@link CommitRequest#getMessage()} returns <code>null</code>
-     * @see CommitRequest
-     */
-    Revision commit(CommitRequest request) throws GitException;
+  /**
+   * Perform clone with sparse-checkout to specified directory.
+   *
+   * @param directory path to keep in working tree
+   * @param remoteUrl url to clone
+   * @throws UnauthorizedException if it is not possible to clone with existing credentials
+   * @throws GitException if any other error occurs
+   */
+  void cloneWithSparseCheckout(String directory, String remoteUrl)
+      throws GitException, UnauthorizedException;
 
-    /**
-     * Show diff between commits.
-     *
-     * @param request
-     *         diff request
-     * @return diff page. Diff info can be serialized to stream by using method {@link DiffPage#writeTo(java.io.OutputStream)}
-     * @throws GitException
-     *         if any error occurs
-     * @see DiffPage
-     * @see DiffRequest
-     */
-    DiffPage diff(DiffRequest request) throws GitException;
+  /**
+   * Commit current state of index in new commit.
+   *
+   * @param params commit params
+   * @return new commit
+   * @throws GitException if any error occurs
+   * @see CommitParams
+   */
+  Revision commit(CommitParams params) throws GitException;
 
-    /**
-     * Show content of the file from specified revision or branch.
-     *
-     * @param request
-     *         request with file and hash of revision or branch
-     * @return response with content of the file
-     * @throws GitException
-     *         if any error occurs
-     * @see ShowFileContentRequest
-     * @see ShowFileContentResponse
-     */
-    ShowFileContentResponse showFileContent(ShowFileContentRequest request) throws GitException;
+  /**
+   * Show diff between commits.
+   *
+   * @param params diff params
+   * @return diff page. Diff info can be serialized to stream by using method {@link
+   *     DiffPage#writeTo(java.io.OutputStream)}
+   * @throws GitException if any error occurs
+   * @see DiffPage
+   * @see DiffParams
+   */
+  DiffPage diff(DiffParams params) throws GitException;
 
-    /**
-     * Fetch data from remote repository.
-     *
-     * @param request
-     *         fetch request
-     * @throws GitException
-     *         if any error occurs
-     * @see FetchRequest
-     */
-    void fetch(FetchRequest request) throws UnauthorizedException, GitException;
+  /**
+   * Get list of edited regions (insertions, modifications, removals) of the file.
+   *
+   * @param file path of the file
+   * @return list of {@link EditedRegion} objects that contain type and range of the editing
+   * @throws GitException if any error occurs
+   */
+  List<EditedRegion> getEditedRegions(String file) throws GitException;
 
-    /**
-     * Initialize new Git repository.
-     *
-     * @param request
-     *         init request
-     * @throws GitException
-     *         if any error occurs
-     * @see InitRequest
-     */
-    void init(InitRequest request) throws GitException;
+  /**
+   * Show content of the file from specified revision or branch.
+   *
+   * @param file path of the file to show
+   * @param version hash of revision or branch
+   * @return response that contains content of the file
+   * @throws GitException if any error occurs
+   */
+  ShowFileContentResponse showFileContent(String file, String version) throws GitException;
 
-    /**
-     * Check if directory, which was used to create Git connection, is inside the working tree.
-     *
-     * @return <b>true</b> if only directory is inside working tree, and <b>false</b> if directory is outside the working tree including directory inside .git directory, or bare repository. 
-     *
-     * @throws GitException
-     *         if any error occurs
-     */
-    boolean isInsideWorkTree() throws GitException;
+  /**
+   * Fetch data from remote repository.
+   *
+   * @param params fetch params
+   * @throws UnauthorizedException if it is not possible to fetch with existing credentials
+   * @throws GitException if any other error occurs
+   * @see FetchParams
+   */
+  void fetch(FetchParams params) throws UnauthorizedException, GitException;
 
-    /**
-     * Get commit logs.
-     *
-     * @param request
-     *         log request
-     * @return log page. Logs can be serialized to stream by using method {@link DiffPage#writeTo(java.io.OutputStream)}
-     * @throws GitException
-     *         if any error occurs
-     * @see LogRequest
-     */
-    LogPage log(LogRequest request) throws GitException;
+  /**
+   * Initialize new Git repository.
+   *
+   * @param bare <code>true</code> to create bare repository
+   * @throws GitException if any error occurs
+   */
+  void init(boolean bare) throws GitException;
 
-    /**
-     * List references in a remote repository.
-     *
-     * @param request
-     *         ls-remote request
-     * @return list references in a remote repository.
-     * @throws GitException
-     *         if any error occurs
-     * @see LsRemoteRequest
-     */
-    List<RemoteReference> lsRemote(LsRemoteRequest request) throws UnauthorizedException, GitException;
+  /**
+   * Check if directory, which was used to create Git connection, is inside the working tree.
+   *
+   * @return <b>true</b> if only directory is inside working tree, and <b>false</b> if directory is
+   *     outside the working tree including directory inside .git directory, or bare repository.
+   * @throws GitException if any error occurs
+   */
+  boolean isInsideWorkTree() throws GitException;
 
-    /**
-     * Merge commits.
-     *
-     * @param request
-     *         merge request
-     * @return result of merge
-     * @throws IllegalArgumentException
-     *         if {@link MergeRequest#getCommit()} returns invalid value, e.g. there is no specified commit
-     * @throws GitException
-     *         if any error occurs
-     * @see MergeRequest
-     */
-    MergeResult merge(MergeRequest request) throws GitException;
+  /**
+   * Get commit logs.
+   *
+   * @param params log params
+   * @return log page. Logs can be serialized to stream by using method {@link
+   *     DiffPage#writeTo(java.io.OutputStream)}
+   * @throws GitException if any error occurs
+   * @see LogParams
+   */
+  LogPage log(LogParams params) throws GitException;
 
-    /**
-     * Rebase on a branch
-     *
-     * @param request
-     *         rebase request
-     * @throws GitException
-     *         if any error occurs when checkout
-     * @see RebaseRequest
-     */
-    RebaseResponse rebase(RebaseRequest request) throws GitException;
+  /**
+   * List references in a remote repository.
+   *
+   * @param remoteUrl url of the remote repository
+   * @return list references in a remote repository.
+   * @throws UnauthorizedException if it is not possible to list references with existing
+   *     credentials
+   * @throws GitException if any other error occurs
+   */
+  List<RemoteReference> lsRemote(String remoteUrl) throws UnauthorizedException, GitException;
 
-    /**
-     * Move or rename file or directory.
-     *
-     * @param request
-     *         move request
-     * @throws IllegalArgumentException
-     *         if {@link MoveRequest#getSource()} or {@link MoveRequest#getTarget()} returns invalid value, e.g.
-     *         there is not specified source or specified target already exists
-     * @throws GitException
-     *         if any error occurs
-     * @see MoveRequest
-     */
-    void mv(MoveRequest request) throws GitException;
+  /**
+   * Merge commits.
+   *
+   * @param commit hash of commit to merge
+   * @return result of merge
+   * @throws GitException if any error occurs
+   */
+  MergeResult merge(String commit) throws GitException;
 
-    /**
-     * Pull (fetch and merge at once) changes from remote repository to local branch.
-     *
-     * @param request
-     *         pull request
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         if remote configuration is invalid
-     * @see PullRequest
-     */
-    PullResponse pull(PullRequest request) throws GitException, UnauthorizedException;
+  /**
+   * Rebase on a branch.
+   *
+   * @param operation rebase operation to use
+   * @param branch rebase branch to use
+   * @throws GitException if any error occurs when checkout
+   */
+  RebaseResponse rebase(String operation, String branch) throws GitException;
 
-    /**
-     * Send changes from local repository to remote one.
-     *
-     * @param request
-     *         push request
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         if remote configuration is invalid
-     * @see PushRequest
-     */
-    PushResponse push(PushRequest request) throws GitException, UnauthorizedException;
+  /**
+   * Move or rename file or directory.
+   *
+   * @param source file that will be moved or renamed
+   * @param target new name or destination directory
+   * @throws GitException if any error occurs
+   */
+  void mv(String source, String target) throws GitException;
 
-    /**
-     * Add new remote configuration.
-     *
-     * @param request
-     *         add remote configuration request
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         if remote (see {@link RemoteAddRequest#getName()}) already exists or any updated parameter (e.g.
-     *         URLs) invalid
-     * @see RemoteAddRequest
-     */
-    void remoteAdd(RemoteAddRequest request) throws GitException;
+  /**
+   * Pull (fetch and merge at once) changes from remote repository to local branch.
+   *
+   * @param params pull params
+   * @throws UnauthorizedException if it is not possible to pull with existing credentials
+   * @throws GitException if any other error occurs
+   * @see PullParams
+   */
+  PullResponse pull(PullParams params) throws GitException, UnauthorizedException;
 
-    /**
-     * Remove the remote named <code>name</code>. All remote tracking branches and configuration settings for the remote are removed.
-     *
-     * @param name
-     *         remote configuration to remove
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         if remote <code>name</code> not found
-     */
-    void remoteDelete(String name) throws GitException;
+  /**
+   * Send changes from local repository to remote one.
+   *
+   * @param params push params
+   * @throws UnauthorizedException if it is not possible to push with existing credentials
+   * @throws GitException if any other error occurs
+   * @see PushParams
+   */
+  PushResponse push(PushParams params) throws GitException, UnauthorizedException;
 
-    /**
-     * Show remotes.
-     *
-     * @param request
-     *         remote list request
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         if remote <code>name</code> not found
-     * @see RemoteListRequest
-     */
-    List<Remote> remoteList(RemoteListRequest request) throws GitException;
+  /**
+   * Add new remote configuration.
+   *
+   * @param params add remote configuration params
+   * @throws GitException if any error occurs
+   * @see RemoteAddParams
+   */
+  void remoteAdd(RemoteAddParams params) throws GitException;
 
-    /**
-     * Update remote configuration.
-     *
-     * @param request
-     *         update remote configuration request
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         if remote configuration (see {@link RemoteUpdateRequest#getName()}) not found or any updated
-     *         parameter (e.g. URLs) invalid
-     * @see RemoteUpdateRequest
-     */
-    void remoteUpdate(RemoteUpdateRequest request) throws GitException;
+  /**
+   * Remove the remote named <code>name</code>. All remote tracking branches and configuration
+   * settings for the remote are removed.
+   *
+   * @param name remote configuration to remove
+   * @throws GitException if any error occurs
+   */
+  void remoteDelete(String name) throws GitException;
 
-    /**
-     * Reset current HEAD to the specified state.
-     *
-     * @param request
-     *         reset request
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         if reset type or commit is invalid
-     * @see ResetRequest
-     * @see ResetRequest#getCommit()
-     * @see ResetRequest#getType()
-     */
-    void reset(ResetRequest request) throws GitException;
+  /**
+   * Show remotes.
+   *
+   * @param remoteName name of the remote
+   * @param verbose if <code>true</code> show remote url and name, otherwise show remote name only
+   * @throws GitException if any error occurs
+   */
+  List<Remote> remoteList(String remoteName, boolean verbose) throws GitException;
 
-    /**
-     * Remove files.
-     *
-     * @param request
-     *         remove request
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         {@link RmRequest#getFiles()} returns <code>null</code> or empty array
-     * @see RmRequest
-     */
-    void rm(RmRequest request) throws GitException;
+  /**
+   * Update remote configuration.
+   *
+   * @param params update remote configuration params
+   * @throws GitException if any error occurs
+   * @see RemoteUpdateParams
+   */
+  void remoteUpdate(RemoteUpdateParams params) throws GitException;
 
-    /**
-     * Get status of working tree.
-     *
-     * @param format
-     *         the format of the ouput
-     * @return status.
-     * @throws GitException
-     *         if any error occurs
-     */
-    Status status(StatusFormat format) throws GitException;
+  /**
+   * Reset current HEAD to the specified state.
+   *
+   * @param params reset params
+   * @throws GitException if any error occurs
+   * @see ResetParams
+   */
+  void reset(ResetParams params) throws GitException;
 
-    /**
-     * Create new tag.
-     *
-     * @param request
-     *         tag create request
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         if tag name ( {@link TagCreateRequest#getName()} ) is invalid or <code>null</code>
-     * @see TagCreateRequest
-     */
-    Tag tagCreate(TagCreateRequest request) throws GitException;
+  /**
+   * Remove files.
+   *
+   * @param params remove params
+   * @throws GitException if any error occurs
+   * @see RmParams
+   */
+  void rm(RmParams params) throws GitException;
 
-    /**
-     * @param request
-     *         delete tag request
-     * @throws GitException
-     *         if any error occurs
-     * @throws IllegalArgumentException
-     *         if there is tag with specified name (see {@link TagDeleteRequest#getName()})
-     * @see TagDeleteRequest
-     */
-    void tagDelete(TagDeleteRequest request) throws GitException;
+  /**
+   * Get status.
+   *
+   * @param filter list of paths to filter the status. Status result will include only files witch
+   *     paths are contained in the filter list, or are children of the folder paths that are
+   *     mentioned in the filter list. Unfiltered status of working tree will be returned, if the
+   *     filter list is empty
+   * @return status.
+   * @throws GitException if any error occurs
+   */
+  Status status(List<String> filter) throws GitException;
 
-    /**
-     * Get list of available tags.
-     *
-     * @param request
-     *         tag list request
-     * @return list of tags matched to request, see {@link TagListRequest#getPattern()}
-     * @throws GitException
-     *         if any error occurs
-     * @see TagListRequest
-     */
-    List<Tag> tagList(TagListRequest request) throws GitException;
+  /**
+   * Create new tag.
+   *
+   * @param params tag create params
+   * @throws GitException if any error occurs
+   * @see TagCreateParams
+   */
+  Tag tagCreate(TagCreateParams params) throws GitException;
 
-    /**
-     * Gel list of commiters in current repository.
-     *
-     * @return list of commiters
-     * @throws GitException
-     */
-    List<GitUser> getCommiters() throws GitException;
+  /**
+   * @param name name of the tag to delete
+   * @throws GitException if any error occurs
+   */
+  void tagDelete(String name) throws GitException;
 
-    /** Get configuration. */
-    Config getConfig() throws GitException;
+  /**
+   * Returns list of available tags.
+   *
+   * @param pattern tag's names pattern
+   * @return list of tags matched to request
+   * @throws GitException if any error occurs
+   */
+  List<Tag> tagList(String pattern) throws GitException;
 
-    /** Close connection, release associated resources. */
-    @Override
-    void close();
+  /**
+   * Gel list of commiters in current repository.
+   *
+   * @return list of commiters
+   * @throws GitException
+   */
+  List<GitUser> getCommiters() throws GitException;
 
-    /** Set publisher for git output, e.g. for sending git command output to the client side. */
-    void setOutputLineConsumerFactory(LineConsumerFactory outputPublisherFactory);
+  /** Get configuration. */
+  Config getConfig() throws GitException;
+
+  /** Close connection, release associated resources. */
+  @Override
+  void close();
+
+  /** Set publisher for git output, e.g. for sending git command output to the client side. */
+  void setOutputLineConsumerFactory(LineConsumerFactory outputPublisherFactory);
+
+  /**
+   * Get the current branch on the current directory
+   *
+   * @deprecated Use {@link #getCurrentReference()} instead.
+   * @return the name of the branch or <i>HEAD</i> if the repo points to tag or commit
+   * @throws GitException if any exception occurs
+   */
+  String getCurrentBranch() throws GitException;
+
+  /**
+   * Get the current reference on the current directory
+   *
+   * @return reference object with branch, tag or commit id
+   * @throws GitException if any exception occurs
+   */
+  Reference getCurrentReference() throws GitException;
+
+  /**
+   * Revert the specified commit
+   *
+   * @param commit the commit to revert
+   * @throws GitException if any error occurs
+   */
+  RevertResult revert(String commit) throws GitException;
 }

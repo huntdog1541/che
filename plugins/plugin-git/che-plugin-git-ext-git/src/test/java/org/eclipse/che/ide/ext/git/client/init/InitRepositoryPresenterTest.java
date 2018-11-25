@@ -1,106 +1,87 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.git.client.init;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
-import com.googlecode.gwt.test.utils.GwtReflectionUtils;
-
-import org.eclipse.che.ide.ext.git.client.BaseTest;
-import org.eclipse.che.ide.ext.git.client.GitRepositoryInitializer;
-import org.junit.Test;
-import org.mockito.Mock;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-
-import java.lang.reflect.Method;
-
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.eclipse.che.ide.ext.git.client.init.InitRepositoryPresenter.INIT_COMMAND_NAME;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyObject;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import org.eclipse.che.api.promises.client.Operation;
+import org.eclipse.che.ide.api.notification.StatusNotification;
+import org.eclipse.che.ide.ext.git.client.BaseTest;
+import org.eclipse.che.ide.resource.Path;
+import org.junit.Test;
 
 /**
  * Testing {@link InitRepositoryPresenter} functionality.
  *
  * @author Andrey Plotnikov
  * @author Roman Nikitenko
+ * @author Vlad Zhukovskyi
  */
 public class InitRepositoryPresenterTest extends BaseTest {
-    @Mock
-    private GitRepositoryInitializer gitRepositoryInitializer;
 
-    private InitRepositoryPresenter presenter;
+  private InitRepositoryPresenter presenter;
 
-    @Override
-    public void disarm() {
-        super.disarm();
+  @Override
+  public void disarm() {
+    super.disarm();
 
-        presenter = new InitRepositoryPresenter(appContext,
-                                                constant,
-                                                notificationManager,
-                                                gitRepositoryInitializer,
-                                                projectServiceClient,
-                                                dtoUnmarshallerFactory,
-                                                eventBus,
-                                                gitOutputConsoleFactory,
-                                                consolesPanelPresenter);
-    }
+    presenter =
+        new InitRepositoryPresenter(
+            constant,
+            notificationManager,
+            gitOutputConsoleFactory,
+            processesPanelPresenter,
+            service,
+            appContext);
 
-    @Test
-    public void testOnOkClickedInitWSRequestAndGetProjectIsSuccessful() throws Exception {
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                AsyncCallback<Void> callback = (AsyncCallback<Void>)arguments[1];
-                @SuppressWarnings("NonJREEmulationClassesInClientCode")
-                Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-                onSuccess.invoke(callback, (Void)null);
-                return callback;
-            }
-        }).when(gitRepositoryInitializer).initGitRepository(anyObject(), (AsyncCallback<Void>)anyObject());
+    when(service.init(any(Path.class), anyBoolean())).thenReturn(voidPromise);
+    when(voidPromise.then(any(Operation.class))).thenReturn(voidPromise);
+    when(voidPromise.catchError(any(Operation.class))).thenReturn(voidPromise);
+  }
 
-        presenter.initRepository();
+  @Test
+  public void testOnOkClickedInitWSRequestAndGetProjectIsSuccessful() throws Exception {
+    presenter.initRepository(project);
 
-        verify(gitRepositoryInitializer).initGitRepository(eq(rootProjectConfig), (AsyncCallback<Void>)anyObject());
-        verify(gitOutputConsoleFactory).create(INIT_COMMAND_NAME);
-        verify(console).print(eq(constant.initSuccess()));
-        verify(consolesPanelPresenter).addCommandOutput(anyString(), eq(console));
-        verify(notificationManager).notify(anyString(), rootProjectConfig);
-    }
+    verify(voidPromise).then(voidPromiseCaptor.capture());
+    voidPromiseCaptor.getValue().apply(null);
 
-    @Test
-    public void testOnOkClickedInitWSRequestIsFailed() throws Exception {
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                AsyncCallback<String> callback = (AsyncCallback<String>)arguments[1];
-                @SuppressWarnings("NonJREEmulationClassesInClientCode")
-                Method onFailure = GwtReflectionUtils.getMethod(callback.getClass(), "onFailure");
-                onFailure.invoke(callback, mock(Throwable.class));
-                return callback;
-            }
-        }).when(gitRepositoryInitializer).initGitRepository(anyObject(), (AsyncCallback<Void>)anyObject());
+    verify(gitOutputConsoleFactory).create(eq(INIT_COMMAND_NAME));
+    verify(console).print(eq(constant.initSuccess()));
+    verify(processesPanelPresenter).addCommandOutput(eq(console));
+    verify(notificationManager).notify(anyString());
 
-        presenter.initRepository();
+    verify(project).synchronize();
+  }
 
-        verify(gitRepositoryInitializer).initGitRepository(eq(rootProjectConfig), (AsyncCallback<Void>)anyObject());
-        verify(constant).initFailed();
-        verify(gitOutputConsoleFactory).create(INIT_COMMAND_NAME);
-        verify(console).printError(eq(constant.initFailed()));
-        verify(consolesPanelPresenter).addCommandOutput(anyString(), eq(console));
-        verify(notificationManager).notify(anyString(), rootProjectConfig);
-    }
+  @Test
+  public void testOnOkClickedInitWSRequestIsFailed() throws Exception {
+    presenter.initRepository(project);
+
+    verify(voidPromise).catchError(promiseErrorCaptor.capture());
+    promiseErrorCaptor.getValue().apply(promiseError);
+
+    verify(constant).initFailed();
+    verify(gitOutputConsoleFactory).create(INIT_COMMAND_NAME);
+    verify(console).printError(anyObject());
+    verify(processesPanelPresenter).addCommandOutput(eq(console));
+    verify(notificationManager)
+        .notify(anyString(), any(StatusNotification.Status.class), anyObject());
+  }
 }

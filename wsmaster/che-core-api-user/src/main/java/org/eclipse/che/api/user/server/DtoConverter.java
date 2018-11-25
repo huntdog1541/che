@@ -1,17 +1,18 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.user.server;
 
-import org.eclipse.che.api.user.server.dao.User;
-import org.eclipse.che.api.user.shared.dto.UserDescriptor;
+import org.eclipse.che.api.core.model.user.User;
+import org.eclipse.che.api.user.shared.dto.UserDto;
 import org.eclipse.che.dto.server.DtoFactory;
 
 /**
@@ -21,17 +22,15 @@ import org.eclipse.che.dto.server.DtoFactory;
  */
 public final class DtoConverter {
 
-    /**
-     * Converts {@link User} to {@link UserDescriptor}.
-     */
-    public static UserDescriptor toDescriptor(User user) {
-        return DtoFactory.getInstance().createDto(UserDescriptor.class)
-                         .withId(user.getId())
-                         .withEmail(user.getEmail())
-                         .withName(user.getName())
-                         .withAliases(user.getAliases())
-                         .withPassword("<none>");
-    }
+  /** Converts {@link User} to {@link UserDto}. */
+  public static UserDto asDto(User user) {
+    return DtoFactory.getInstance()
+        .createDto(UserDto.class)
+        .withId(user.getId())
+        .withEmail(user.getEmail())
+        .withName(user.getName())
+        .withAliases(user.getAliases());
+  }
 
-    private DtoConverter() {}
+  private DtoConverter() {}
 }

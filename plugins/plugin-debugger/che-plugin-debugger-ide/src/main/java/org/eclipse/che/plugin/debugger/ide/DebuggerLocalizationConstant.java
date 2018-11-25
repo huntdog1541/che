@@ -1,13 +1,14 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.plugin.debugger.ide;
 
 /**
@@ -17,183 +18,284 @@ package org.eclipse.che.plugin.debugger.ide;
  */
 public interface DebuggerLocalizationConstant extends com.google.gwt.i18n.client.Messages {
 
-    /* actions */
-    @Key("debugConfigurationsActionTitle")
-    String debugConfigurationsActionTitle();
+  /* actions */
+  @Key("editDebugConfigurationsActionTitle")
+  String editDebugConfigurationsActionTitle();
 
-    @Key("editDebugConfigurationsActionTitle")
-    String editDebugConfigurationsActionTitle();
+  @Key("breakpoints")
+  String breakpoints();
 
-    @Key("breakpoints")
-    String breakpoints();
+  @Key("debug")
+  String debug();
 
-    @Key("debug")
-    String debug();
+  @Key("disconnectDebugger")
+  String disconnectDebugger();
 
-    @Key("disconnectDebugger")
-    String disconnectDebugger();
+  @Key("host")
+  String host();
 
-    @Key("host")
-    String host();
+  @Key("port")
+  String port();
 
-    @Key("port")
-    String port();
+  @Key("deleteAllBreakpoints")
+  String deleteAllBreakpoints();
 
-    @Key("deleteAllBreakpoints")
-    String deleteAllBreakpoints();
+  @Key("resumeExecution")
+  String resumeExecution();
 
-    @Key("resumeExecution")
-    String resumeExecution();
+  @Key("variables")
+  String variables();
 
-    @Key("variables")
-    String variables();
+  @Key("stepInto")
+  String stepInto();
 
-    @Key("stepInto")
-    String stepInto();
+  @Key("stepOver")
+  String stepOver();
 
-    @Key("stepOver")
-    String stepOver();
+  @Key("stepOut")
+  String stepOut();
 
-    @Key("stepOut")
-    String stepOut();
+  @Key("runToCursor")
+  String runToCursor();
 
-    @Key("changeVariableValue")
-    String changeVariableValue();
+  @Key("suspend")
+  String suspend();
 
-    @Key("evaluateExpression")
-    String evaluateExpression();
+  @Key("editDebugVariable")
+  String editDebugVariable();
 
-    @Key("showHideDebuggerPanel")
-    String showHideDebuggerPanel();
+  @Key("evaluateExpression")
+  String evaluateExpression();
 
-    /* actions descriptions */
-    @Key("editDebugConfigurationsActionDescription")
-    String editDebugConfigurationsActionDescription();
+  @Key("showHideDebuggerPanel")
+  String showHideDebuggerPanel();
 
-    @Key("debugConfigurationActionDescription")
-    String debugConfigurationActionDescription();
+  @Key("breakpointConfiguration")
+  String breakpointConfiguration();
 
-    @Key("resumeExecutionDescription")
-    String resumeExecutionDescription();
+  @Key("enableBreakpoint")
+  String enableBreakpoint();
 
-    @Key("disconnectDebuggerDescription")
-    String disconnectDebuggerDescription();
+  @Key("disableBreakpoint")
+  String disableBreakpoint();
 
-    @Key("stepIntoDescription")
-    String stepIntoDescription();
+  @Key("deleteBreakpoint")
+  String deleteBreakpoint();
 
-    @Key("stepOverDescription")
-    String stepOverDescription();
+  /* actions descriptions */
+  @Key("editDebugConfigurationsActionDescription")
+  String editDebugConfigurationsActionDescription();
 
-    @Key("stepOutDescription")
-    String stepOutDescription();
+  @Key("debugConfigurationActionDescription")
+  String debugConfigurationActionDescription();
 
-    @Key("deleteAllBreakpointsDescription")
-    String deleteAllBreakpointsDescription();
+  @Key("resumeExecutionDescription")
+  String resumeExecutionDescription();
 
-    @Key("changeVariableValueDescription")
-    String changeVariableValueDescription();
+  @Key("disconnectDebuggerDescription")
+  String disconnectDebuggerDescription();
 
-    @Key("evaluateExpressionDescription")
-    String evaluateExpressionDescription();
+  @Key("stepIntoDescription")
+  String stepIntoDescription();
 
-    @Key("showHideDebuggerPanelDescription")
-    String showHideDebuggerPanelDescription();
+  @Key("stepOverDescription")
+  String stepOverDescription();
 
-    /* messages */
-    @Key("debugger.connecting.title")
-    String debuggerConnectingTitle(String address);
+  @Key("stepOutDescription")
+  String stepOutDescription();
 
-    @Key("debugger.connected.title")
-    String debuggerConnectedTitle();
+  @Key("runToCursorDescription")
+  String runToCursorDescription();
 
-    @Key("debugger.connected.description")
-    String debuggerConnectedDescription(String address);
+  @Key("suspendDescription")
+  String suspendDescription();
 
-    @Key("debugger.disconnected.title")
-    String debuggerDisconnectedTitle();
+  @Key("deleteAllBreakpointsDescription")
+  String deleteAllBreakpointsDescription();
 
-    @Key("debugger.disconnected.description")
-    String debuggerDisconnectedDescription(String address);
+  @Key("editDebugVariableDescription")
+  String editDebugVariableDescription();
 
-    @Key("debugger.already.connected")
-    String debuggerAlreadyConnected();
+  @Key("evaluateExpressionDescription")
+  String evaluateExpressionDescription();
 
-    @Key("failed.to.connect.to.remote.debugger.description")
-    String failedToConnectToRemoteDebuggerDescription(String address);
+  @Key("showHideDebuggerPanelDescription")
+  String showHideDebuggerPanelDescription();
 
-    @Key("failed.to.get.variable.value.title")
-    String failedToGetVariableValueTitle();
+  @Key("enableBreakpointDescription")
+  String enableBreakpointDescription();
 
-    /* ChangeValueView */
-    @Key("view.changeValue.title")
-    String changeValueViewTitle();
+  @Key("disableBreakpointDescription")
+  String disableBreakpointDescription();
 
-    @Key("view.changeValue.expressionField.title")
-    String changeValueViewExpressionFieldTitle(String varName);
+  @Key("deleteBreakpointDescription")
+  String deleteBreakpointDescription();
 
-    @Key("view.changeValue.changeButton.title")
-    String changeValueViewChangeButtonTitle();
+  /* messages */
+  @Key("debugger.connecting.title")
+  String debuggerConnectingTitle(String address);
 
-    @Key("view.changeValue.cancelButton.title")
-    String changeValueViewCancelButtonTitle();
+  @Key("debugger.connected.title")
+  String debuggerConnectedTitle();
 
-    /* EvaluateExpressionView */
-    @Key("view.evaluateExpression.title")
-    String evaluateExpressionViewTitle();
+  @Key("debugger.connected.description")
+  String debuggerConnectedDescription(String address);
 
-    @Key("view.evaluateExpression.expressionField.title")
-    String evaluateExpressionViewExpressionFieldTitle();
+  @Key("debugger.disconnected.title")
+  String debuggerDisconnectedTitle();
 
-    @Key("view.evaluateExpression.resultField.title")
-    String evaluateExpressionViewResultFieldTitle();
+  @Key("debugger.disconnected.description")
+  String debuggerDisconnectedDescription(String address);
 
-    @Key("view.evaluateExpression.evaluateButton.title")
-    String evaluateExpressionViewEvaluateButtonTitle();
+  @Key("debugger.already.connected")
+  String debuggerAlreadyConnected();
 
-    @Key("view.evaluateExpression.closeButton.title")
-    String evaluateExpressionViewCloseButtonTitle();
+  @Key("failed.to.connect.to.remote.debugger.description")
+  String failedToConnectToRemoteDebuggerDescription(String address, String cause);
 
-    @Key("evaluateExpressionFailed")
-    String evaluateExpressionFailed(String reason);
+  /* ChangeValueView */
+  @Key("view.breakpoint.configuration.title")
+  String breakpointConfigurationTitle();
 
-    @Key("connect.to.remote")
-    String connectToRemote();
+  /* ChangeValueView */
+  @Key("view.changeValue.title")
+  String changeValueViewTitle();
 
-    @Key("debugActionTitle")
-    String debugActionTitle();
+  @Key("view.changeValue.expressionField.title")
+  String changeValueViewExpressionFieldTitle(String varName);
 
-    @Key("debugActionDescription")
-    String debugActionDescription();
+  @Key("view.changeValue.changeButton.title")
+  String changeValueViewChangeButtonTitle();
 
-    /* EditConfigurations */
-    @Key("view.editConfigurations.placeholder")
-    String editConfigurationsViewPlaceholder();
+  @Key("view.changeValue.cancelButton.title")
+  String changeValueViewCancelButtonTitle();
 
-    @Key("view.editConfigurations.title")
-    String editConfigurationsViewTitle();
+  /* EvaluateExpressionView */
+  @Key("view.evaluateExpression.title")
+  String evaluateExpressionViewTitle();
 
-    @Key("view.editConfigurations.header")
-    String editConfigurationsViewHeader();
+  @Key("view.evaluateExpression.expressionField.title")
+  String evaluateExpressionViewExpressionFieldTitle();
 
-    @Key("view.editConfigurations.hint")
-    String editConfigurationsViewHint();
+  @Key("view.evaluateExpression.resultField.title")
+  String evaluateExpressionViewResultFieldTitle();
 
-    @Key("view.editConfigurations.name.text")
-    String editConfigurationsViewNameText();
+  @Key("view.evaluateExpression.evaluateButton.title")
+  String evaluateExpressionViewEvaluateButtonTitle();
 
-    @Key("view.editConfigurations.remove.title")
-    String editConfigurationsViewRemoveTitle();
+  @Key("view.evaluateExpression.closeButton.title")
+  String evaluateExpressionViewCloseButtonTitle();
 
-    @Key("view.editConfigurations.remove.confirmation")
-    String editConfigurationsRemoveConfirmation(String configurationName);
+  @Key("evaluateExpressionFailed")
+  String evaluateExpressionFailed(String reason);
 
-    @Key("view.editConfigurations.saveChanges.title")
-    String editConfigurationsSaveChangesTitle();
+  @Key("connect.to.remote")
+  String connectToRemote();
 
-    @Key("view.editConfigurations.saveChanges.text")
-    String editConfigurationsSaveChangesConfirmation(String configurationName);
+  @Key("debugActionTitle")
+  String debugActionTitle();
 
-    @Key("view.editConfigurations.saveChanges.discard")
-    String editConfigurationsSaveChangesDiscard();
+  @Key("debugActionDescription")
+  String debugActionDescription();
+
+  /* EditConfigurations */
+  @Key("view.editConfigurations.placeholder")
+  String editConfigurationsViewPlaceholder();
+
+  @Key("view.editConfigurations.title")
+  String editConfigurationsViewTitle();
+
+  @Key("view.editConfigurations.header")
+  String editConfigurationsViewHeader();
+
+  @Key("view.editConfigurations.hint")
+  String editConfigurationsViewHint();
+
+  @Key("view.editConfigurations.name.text")
+  String editConfigurationsViewNameText();
+
+  @Key("view.editConfigurations.remove.title")
+  String editConfigurationsViewRemoveTitle();
+
+  @Key("view.editConfigurations.remove.confirmation")
+  String editConfigurationsRemoveConfirmation(String configurationName);
+
+  @Key("view.editConfigurations.saveChanges.title")
+  String editConfigurationsSaveChangesTitle();
+
+  @Key("view.editConfigurations.saveChanges.text")
+  String editConfigurationsSaveChangesConfirmation(String configurationName);
+
+  @Key("view.editConfigurations.saveChanges.discard")
+  String editConfigurationsSaveChangesDiscard();
+
+  @Key("debugger.frames.title")
+  String debuggerFramesTitle();
+
+  @Key("debugger.threadNotSuspend")
+  String debuggerThreadNotSuspend();
+
+  /* Breakpoint Configuration */
+  @Key("view.breakpointConfiguration.condition")
+  String viewBreakpointConfigurationCondition();
+
+  @Key("view.breakpointConfiguration.enabled")
+  String viewBreakpointConfigurationEnabled();
+
+  @Key("view.breakpointConfiguration.hitCount")
+  String viewBreakpointConfigurationHitCount();
+
+  @Key("view.breakpointConfiguration.applyButton")
+  String viewBreakpointConfigurationApplyButton();
+
+  @Key("view.breakpointConfiguration.suspend")
+  String viewBreakpointConfigurationSuspend();
+
+  @Key("view.breakpointConfiguration.suspend.all")
+  String viewBreakpointConfigurationSuspendAll();
+
+  @Key("view.breakpointConfiguration.suspend.thread")
+  String viewBreakpointConfigurationSuspendThread();
+
+  @Key("view.breakpointConfiguration.suspend.none")
+  String viewBreakpointConfigurationSuspendNone();
+
+  @Key("add.watch.expression")
+  String addWatchExpression();
+
+  @Key("remove.watch.expression")
+  String removeWatchExpression();
+
+  @Key("addWatchExpressionDescription")
+  String addWatchExpressionDescription();
+
+  @Key("removeWatchExpressionDescription")
+  String removeWatchExpressionDescription();
+
+  @Key("add.expression.view.dialog.title")
+  String addExpressionViewDialogTitle();
+
+  @Key("add.expression.view.save.button.title")
+  String addExpressionViewSaveButtonTitle();
+
+  @Key("add.expression.view.cancel.button.title")
+  String addExpressionViewCancelButtonTitle();
+
+  @Key("edit.expression.view.dialog.title")
+  String editExpressionViewDialogTitle();
+
+  @Key("edit.expression.view.save.button.title")
+  String editExpressionViewSaveButtonTitle();
+
+  @Key("edit.expression.view.cancel.button.title")
+  String editExpressionViewCancelButtonTitle();
+
+  @Key("edit.expression.view.expression.field.title")
+  String editExpressionViewExpressionFieldTitle();
+
+  @Key("action.switch.debugger.displaying.title")
+  String switchDebuggerDisplayingTitle();
+
+  @Key("action.switch.debugger.displaying.description")
+  String switchDebuggerDisplayingDescription();
 }

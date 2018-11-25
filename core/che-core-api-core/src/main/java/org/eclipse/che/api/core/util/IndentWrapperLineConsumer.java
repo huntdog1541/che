@@ -1,13 +1,14 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.core.util;
 
 import java.io.IOException;
@@ -19,21 +20,21 @@ import java.io.IOException;
  */
 public class IndentWrapperLineConsumer implements LineConsumer {
 
-    private final LineConsumer lineConsumer;
+  private final LineConsumer lineConsumer;
 
-    public IndentWrapperLineConsumer(LineConsumer lineConsumer) {
-        this.lineConsumer = lineConsumer;
-    }
+  public IndentWrapperLineConsumer(LineConsumer lineConsumer) {
+    this.lineConsumer = lineConsumer;
+  }
 
-    /** {@inheritDoc} */
-    @Override
-    public void writeLine(String line) throws IOException {
-        lineConsumer.writeLine(line + System.lineSeparator());
-    }
+  /** {@inheritDoc} */
+  @Override
+  public void writeLine(String line) throws IOException {
+    lineConsumer.writeLine(line + System.lineSeparator());
+  }
 
-    /** {@inheritDoc} */
-    @Override
-    public void close() throws IOException {
-        lineConsumer.close();
-    }
+  /** {@inheritDoc} */
+  @Override
+  public void close() throws IOException {
+    lineConsumer.close();
+  }
 }

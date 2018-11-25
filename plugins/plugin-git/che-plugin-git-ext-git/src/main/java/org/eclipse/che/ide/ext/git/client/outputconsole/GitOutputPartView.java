@@ -1,13 +1,14 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.git.client.outputconsole;
 
 import org.eclipse.che.ide.api.mvp.View;
@@ -18,49 +19,39 @@ import org.eclipse.che.ide.api.mvp.View;
  * @author Andrey Plotnikov
  */
 public interface GitOutputPartView extends View<GitOutputPartView.ActionDelegate> {
-    public interface ActionDelegate {
-        /**
-         * Handle user clicks on clear console button.
-         */
-        void onClearClicked();
-        /**
-         * Handle user clicks on scroll console button.
-         */
-        void onScrollClicked();
-    }
 
-    /**
-     * Print text in console area.
-     *
-     * @param text
-     *         text that need to be shown
-     */
-    void print(String text);
+  interface ActionDelegate {
+    /** Handle user clicks on clear console button. */
+    void onClearClicked();
+    /** Handle user clicks on scroll console button. */
+    void onScrollClicked();
+  }
 
-    /**
-     * Print colored text in console area.
-     *
-     * @param text
-     *         text that need to be shown
-     * @param color
-     *         color of the text
-     */
+  /**
+   * Print text in console area.
+   *
+   * @param text text that need to be shown
+   */
+  void print(String text);
 
-    void print(String text, String color);
+  /**
+   * Print colored text in console area.
+   *
+   * @param text text that need to be shown
+   * @param color color of the text
+   */
+  void print(String text, String color);
 
-    /**
-     * Set title of console part.
-     *
-     * @param title
-     *         title that need to be set
-     */
-    void setTitle(String title);
+  /**
+   * Set title of console part.
+   *
+   * @param title title that need to be set
+   */
+  void setTitle(String title);
 
-    /** Clear console. Remove all messages. */
-    void clear();
+  /** Clear console. Remove all messages. */
+  void clear();
 
-    /**
-     * Scroll to bottom of the view.
-     */
-    void scrollBottom();
+  /** Scroll to bottom of the view. */
+  void scrollBottom();
 }

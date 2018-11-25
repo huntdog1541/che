@@ -1,41 +1,42 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.plugin.maven.client.actions;
 
+import static com.google.common.base.Preconditions.checkState;
+import static org.eclipse.che.ide.api.notification.StatusNotification.DisplayMode.EMERGE_MODE;
+import static org.eclipse.che.ide.api.notification.StatusNotification.Status.FAIL;
+import static org.eclipse.che.ide.part.perspectives.project.ProjectPerspective.PROJECT_PERSPECTIVE_ID;
+import static org.eclipse.che.plugin.maven.shared.MavenAttributes.MAVEN_ID;
+
+import com.google.common.base.Optional;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-
+import java.util.Collections;
+import javax.validation.constraints.NotNull;
 import org.eclipse.che.api.promises.client.Operation;
 import org.eclipse.che.api.promises.client.OperationException;
 import org.eclipse.che.api.promises.client.PromiseError;
 import org.eclipse.che.ide.api.action.AbstractPerspectiveAction;
 import org.eclipse.che.ide.api.action.ActionEvent;
 import org.eclipse.che.ide.api.app.AppContext;
-import org.eclipse.che.ide.api.app.CurrentProject;
 import org.eclipse.che.ide.api.editor.EditorAgent;
 import org.eclipse.che.ide.api.notification.NotificationManager;
-import org.eclipse.che.ide.api.project.node.HasProjectConfig;
-import org.eclipse.che.ide.api.project.tree.VirtualFileImpl;
-import org.eclipse.che.ide.api.project.tree.VirtualFileInfo;
+import org.eclipse.che.ide.api.resources.Project;
+import org.eclipse.che.ide.api.resources.Resource;
+import org.eclipse.che.ide.api.resources.SyntheticFile;
 import org.eclipse.che.plugin.maven.client.MavenLocalizationConstant;
 import org.eclipse.che.plugin.maven.client.MavenResources;
 import org.eclipse.che.plugin.maven.client.service.MavenServerServiceClient;
-
-import javax.validation.constraints.NotNull;
-import java.util.Collections;
-
-import static org.eclipse.che.ide.api.notification.StatusNotification.DisplayMode.EMERGE_MODE;
-import static org.eclipse.che.ide.api.notification.StatusNotification.Status.FAIL;
-import static org.eclipse.che.plugin.maven.shared.MavenAttributes.MAVEN_ID;
-import static org.eclipse.che.ide.workspace.perspectives.project.ProjectPerspective.PROJECT_PERSPECTIVE_ID;
+import org.eclipse.che.plugin.maven.shared.MavenAttributes;
 
 /**
  * Action for generating effective pom.
@@ -44,65 +45,82 @@ import static org.eclipse.che.ide.workspace.perspectives.project.ProjectPerspect
  */
 @Singleton
 public class GetEffectivePomAction extends AbstractPerspectiveAction {
-    private final static String NAME = "effective-pom.xml";
-    private final static String PATH = "effective_pom";
+  private final EditorAgent editorAgent;
+  private final NotificationManager notificationManager;
+  private final MavenServerServiceClient mavenServerServiceClient;
+  private final AppContext appContext;
 
-    private final EditorAgent              editorAgent;
-    private final NotificationManager      notificationManager;
-    private final MavenServerServiceClient mavenServerServiceClient;
-    private final AppContext               appContext;
+  @Inject
+  public GetEffectivePomAction(
+      MavenLocalizationConstant constant,
+      MavenResources mavenResources,
+      EditorAgent editorAgent,
+      NotificationManager notificationManager,
+      MavenServerServiceClient mavenServerServiceClient,
+      AppContext appContext) {
+    super(
+        Collections.singletonList(PROJECT_PERSPECTIVE_ID),
+        constant.actionGetEffectivePomTitle(),
+        constant.actionGetEffectivePomDescription(),
+        mavenResources.maven());
+    this.editorAgent = editorAgent;
+    this.notificationManager = notificationManager;
+    this.mavenServerServiceClient = mavenServerServiceClient;
+    this.appContext = appContext;
+  }
 
-    @Inject
-    public GetEffectivePomAction(MavenLocalizationConstant constant,
-                                 MavenResources mavenResources,
-                                 EditorAgent editorAgent,
-                                 NotificationManager notificationManager,
-                                 MavenServerServiceClient mavenServerServiceClient,
-                                 AppContext appContext) {
-        super(Collections.singletonList(PROJECT_PERSPECTIVE_ID),
-              constant.actionGetEffectivePomTitle(),
-              constant.actionGetEffectivePomDescription(),
-              null,
-              mavenResources.maven());
-        this.editorAgent = editorAgent;
-        this.notificationManager = notificationManager;
-        this.mavenServerServiceClient = mavenServerServiceClient;
-        this.appContext = appContext;
+  @Override
+  public void updateInPerspective(@NotNull ActionEvent event) {
+
+    final Resource resource = appContext.getResource();
+    if (resource == null) {
+      event.getPresentation().setEnabledAndVisible(false);
+      return;
     }
 
-
-    @Override
-    public void updateInPerspective(@NotNull ActionEvent event) {
-        CurrentProject currentProject = appContext.getCurrentProject();
-        if (currentProject == null) {
-            event.getPresentation().setEnabledAndVisible(false);
-            return;
-        }
-        event.getPresentation().setEnabledAndVisible(MAVEN_ID.equals(currentProject.getProjectConfig().getType()));
+    final Optional<Project> project = resource.getRelatedProject();
+    if (!project.isPresent()) {
+      event.getPresentation().setEnabledAndVisible(false);
+      return;
     }
 
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        mavenServerServiceClient.getEffectivePom(appContext.getCurrentProject().getProjectConfig().getPath()).then(new Operation<String>() {
-            @Override
-            public void apply(String content) throws OperationException {
-                HasProjectConfig.ProjectConfig project = new HasProjectConfig.ProjectConfig(appContext.getCurrentProject()
-                                                                                                      .getProjectConfig());
-                VirtualFileInfo fileInfo = VirtualFileInfo.newBuilder()
-                                                          .setContent(content)
-                                                          .setName(NAME)
-                                                          .setDisplayName(NAME)
-                                                          .setProject(project)
-                                                          .setPath(PATH)
-                                                          .build();
+    event.getPresentation().setEnabledAndVisible(project.get().isTypeOf(MAVEN_ID));
+  }
 
-                editorAgent.openEditor(new VirtualFileImpl(fileInfo));
-            }
-        }).catchError(new Operation<PromiseError>() {
-            @Override
-            public void apply(PromiseError arg) throws OperationException {
-                notificationManager.notify("Problem with generating effective pom file", arg.getMessage(), FAIL, EMERGE_MODE);
-            }
-        });
-    }
+  @Override
+  public void actionPerformed(ActionEvent e) {
+    final Resource[] resources = appContext.getResources();
+
+    checkState(resources != null && resources.length == 1);
+
+    final Project project = resources[0].getRelatedProject().get();
+
+    checkState(MAVEN_ID.equals(project.getType()));
+
+    mavenServerServiceClient
+        .getEffectivePom(project.getLocation().toString())
+        .then(
+            new Operation<String>() {
+              @Override
+              public void apply(String content) throws OperationException {
+                editorAgent.openEditor(
+                    new SyntheticFile(
+                        "pom.xml",
+                        project.getAttributes().get(MavenAttributes.ARTIFACT_ID).get(0)
+                            + " [effective pom]",
+                        content));
+              }
+            })
+        .catchError(
+            new Operation<PromiseError>() {
+              @Override
+              public void apply(PromiseError arg) throws OperationException {
+                notificationManager.notify(
+                    "Problem with generating effective pom file",
+                    arg.getMessage(),
+                    FAIL,
+                    EMERGE_MODE);
+              }
+            });
+  }
 }

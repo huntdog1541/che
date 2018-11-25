@@ -1,78 +1,78 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.plugin.maven.client;
 
 import com.google.gwt.i18n.client.Messages;
 
 /**
- * Represents the localization constants contained in resource bundle: 'MavenLocalizationConstant.properties'.
+ * Represents the localization constants contained in resource bundle:
+ * 'MavenLocalizationConstant.properties'.
  *
  * @author Artem Zatsarynnyi
  * @author Dmitry Shnurenko
  */
 public interface MavenLocalizationConstant extends Messages {
 
-    /* Actions */
+  /* Actions */
+  @Key("action.effectivePom.title")
+  String actionGetEffectivePomTitle();
 
-    @Key("action.createMavenModule.text")
-    String actionCreateMavenModuleText();
+  @Key("action.effectivePom.description")
+  String actionGetEffectivePomDescription();
 
-    @Key("action.effectivePom.title")
-    String actionGetEffectivePomTitle();
+  @Key("action.reimportDependencies.title")
+  String actionReimportDependenciesTitle();
 
-    @Key("action.effectivePom.description")
-    String actionGetEffectivePomDescription();
+  @Key("action.reimportDependencies.description")
+  String actionReimportDependenciesDescription();
 
-    @Key("action.createMavenModule.description")
-    String actionCreateMavenModuleDescription();
+  /* MavenCommandPageView */
+  @Key("view.mavenCommandPage.arguments.text")
+  String mavenCommandPageViewArgumentsText();
 
+  @Key("maven.page.artifactIdTooltip")
+  String mavenPageArtifactIdTooltip();
 
-    @Key("maven.build.updateSnapshot")
-    @DefaultMessage("Update Snapshot (-U,--update-snapshots)")
-    String updateSnapshot();
+  @Key("maven.page.groupIdTooltip")
+  String mavenPageGroupIdTooltip();
 
-    @Key("maven.build.updateSnapshot.desc")
-    @DefaultMessage("Forces a check for updated releases \n" +
-                    "and snapshots on remote repositories")
-    String updateSnapshotDesc();
+  @Key("maven.class.decompiled")
+  String mavenClassDecompiled();
 
+  @Key("maven.class.download.sources")
+  String mavenDownloadSources();
 
-    /* MavenCommandPageView */
-    @Key("view.mavenCommandPage.commandLine.text")
-    String mavenCommandPageViewCommandLineText();
+  @Key("maven.class.download.failed")
+  String mavenClassDownloadFailed(String fqn);
 
-    @Key("maven.page.artifactIdTooltip")
-    String mavenPageArtifactIdTooltip();
+  @Key("loader.action.name")
+  String loaderActionName();
 
-    @Key("maven.page.groupIdTooltip")
-    String mavenPageGroupIdTooltip();
+  @Key("loader.action.description")
+  String loaderActionDescription();
 
-    @Key("maven.create.module.multy.selection.error")
-    String mavenCreateModuleMultySelectionError();
+  @Key("window.loader.title")
+  String windowLoaderTitle();
 
-    @Key("maven.class.decompiled")
-    String mavenClassDecompiled();
+  @Key("maven.page.estimate.errorMessage")
+  String mavenPageEstimateErrorMessage();
 
-    @Key("maven.class.download.sources")
-    String mavenDownloadSources();
+  @Key("maven.page.errorDialog.title")
+  String mavenPageErrorDialogTitle();
 
-    @Key("maven.class.download.failed")
-    String mavenClassDownloadFailed(String fqn);
+  /* Preferences page*/
+  @Key("maven.preferences.title")
+  String mavenPreferencesTitle();
 
-    @Key("loader.action.name")
-    String loaderActionName();
-
-    @Key("loader.action.description")
-    String loaderActionDescription();
-
-    @Key("window.loader.title")
-    String windowLoaderTitle();
+  @Key("maven.preferences.show.artifact.id.checkbox.text")
+  String mavenPreferencesShowArtifactIdCheckboxText();
 }

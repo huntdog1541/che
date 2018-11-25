@@ -1,13 +1,14 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.plugin.maven.client.command;
 
 import com.google.gwt.core.client.GWT;
@@ -20,7 +21,6 @@ import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
 import com.google.inject.Inject;
-
 import org.eclipse.che.plugin.maven.client.MavenLocalizationConstant;
 
 /**
@@ -30,80 +30,80 @@ import org.eclipse.che.plugin.maven.client.MavenLocalizationConstant;
  */
 public class MavenCommandPageViewImpl implements MavenCommandPageView {
 
-    private static final MavenPageViewImplUiBinder UI_BINDER = GWT.create(MavenPageViewImplUiBinder.class);
+  private static final MavenPageViewImplUiBinder UI_BINDER =
+      GWT.create(MavenPageViewImplUiBinder.class);
 
-    private final FlowPanel rootElement;
+  private final FlowPanel rootElement;
 
-    @UiField
-    TextBox                   workingDirectory;
-    @UiField
-    TextBox                   commandLine;
-    @UiField(provided = true)
-    MavenLocalizationConstant locale;
+  @UiField TextBox workingDirectory;
+  @UiField TextBox arguments;
 
-    private ActionDelegate delegate;
+  @UiField(provided = true)
+  MavenLocalizationConstant locale;
 
-    @Inject
-    public MavenCommandPageViewImpl(MavenLocalizationConstant locale) {
-        this.locale = locale;
+  private ActionDelegate delegate;
 
-        rootElement = UI_BINDER.createAndBindUi(this);
-    }
+  @Inject
+  public MavenCommandPageViewImpl(MavenLocalizationConstant locale) {
+    this.locale = locale;
 
-    @Override
-    public void setDelegate(ActionDelegate delegate) {
-        this.delegate = delegate;
-    }
+    rootElement = UI_BINDER.createAndBindUi(this);
+  }
 
-    @Override
-    public Widget asWidget() {
-        return rootElement;
-    }
+  @Override
+  public void setDelegate(ActionDelegate delegate) {
+    this.delegate = delegate;
+  }
 
-    @Override
-    public String getWorkingDirectory() {
-        return workingDirectory.getValue();
-    }
+  @Override
+  public Widget asWidget() {
+    return rootElement;
+  }
 
-    @Override
-    public void setWorkingDirectory(String workingDirectory) {
-        this.workingDirectory.setValue(workingDirectory);
-    }
+  @Override
+  public String getWorkingDirectory() {
+    return workingDirectory.getValue();
+  }
 
-    @Override
-    public String getCommandLine() {
-        return commandLine.getValue();
-    }
+  @Override
+  public void setWorkingDirectory(String workingDirectory) {
+    this.workingDirectory.setValue(workingDirectory);
+  }
 
-    @Override
-    public void setCommandLine(String commandLine) {
-        this.commandLine.setValue(commandLine);
-    }
+  @Override
+  public String getArguments() {
+    return arguments.getValue();
+  }
 
-    @UiHandler({"workingDirectory"})
-    void onWorkingDirectoryChanged(KeyUpEvent event) {
-        // commandLine value may not be updated immediately after keyUp
-        // therefore use the timer with delay=0
-        new Timer() {
-            @Override
-            public void run() {
-                delegate.onWorkingDirectoryChanged();
-            }
-        }.schedule(0);
-    }
+  // Note that Closure Compiler doesn't allow to use 'arguments' as a name of a method argument.
+  @Override
+  public void setArguments(String args) {
+    this.arguments.setValue(args);
+  }
 
-    @UiHandler({"commandLine"})
-    void onCommandLineChanged(KeyUpEvent event) {
-        // commandLine value may not be updated immediately after keyUp
-        // therefore use the timer with delay=0
-        new Timer() {
-            @Override
-            public void run() {
-                delegate.onCommandLineChanged();
-            }
-        }.schedule(0);
-    }
+  @UiHandler({"workingDirectory"})
+  void onWorkingDirectoryChanged(KeyUpEvent event) {
+    // workingDirectory value may not be updated immediately after keyUp
+    // therefore use the timer with zero delay
+    new Timer() {
+      @Override
+      public void run() {
+        delegate.onWorkingDirectoryChanged();
+      }
+    }.schedule(0);
+  }
 
-    interface MavenPageViewImplUiBinder extends UiBinder<FlowPanel, MavenCommandPageViewImpl> {
-    }
+  @UiHandler({"arguments"})
+  void onArgumentsChanged(KeyUpEvent event) {
+    // arguments value may not be updated immediately after keyUp
+    // therefore use the timer with zero delay
+    new Timer() {
+      @Override
+      public void run() {
+        delegate.onArgumentsChanged();
+      }
+    }.schedule(0);
+  }
+
+  interface MavenPageViewImplUiBinder extends UiBinder<FlowPanel, MavenCommandPageViewImpl> {}
 }

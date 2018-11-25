@@ -1,23 +1,22 @@
 /*******************************************************************************
- * Copyright (c) 2015-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * Copyright (c) 2015-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
+ *   Red Hat, Inc. - initial API and implementation
  *******************************************************************************/
 
 'use strict';
 
-var path = require('path');
-var gulp = require('gulp');
-var conf = require('./conf');
+let path = require('path');
+let gulp = require('gulp');
+let conf = require('./conf');
 
-var browserSync = require('browser-sync');
-
-var $ = require('gulp-load-plugins')();
+let $ = require('gulp-load-plugins')();
 
 // Downloads the selenium webdriver
 gulp.task('webdriver-update', $.protractor.webdriver_update);
@@ -25,10 +24,10 @@ gulp.task('webdriver-update', $.protractor.webdriver_update);
 gulp.task('webdriver-standalone', $.protractor.webdriver_standalone);
 
 function runProtractor (done) {
-  var params = process.argv;
-  var args = params.length > 3 ? [params[3], params[4]] : [];
+  let params = process.argv;
+  let args = params.length > 3 ? params.slice(3) : [];
 
-  gulp.src(path.join(conf.paths.e2e, '/**/*.js'))
+  gulp.src(path.join(conf.paths.e2e, '/**/*.ts'))
     .pipe($.protractor.protractor({
       configFile: 'protractor.conf.js',
       args: args
@@ -38,8 +37,6 @@ function runProtractor (done) {
       throw err;
     })
     .on('end', function () {
-      // Close browser sync server
-      browserSync.exit();
       done();
     });
 }

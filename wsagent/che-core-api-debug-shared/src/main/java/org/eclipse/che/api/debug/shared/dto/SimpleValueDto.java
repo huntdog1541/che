@@ -1,32 +1,34 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.debug.shared.dto;
 
+import java.util.List;
 import org.eclipse.che.api.debug.shared.model.SimpleValue;
 import org.eclipse.che.dto.shared.DTO;
-
-import java.util.List;
 
 /** @author andrew00x */
 @DTO
 public interface SimpleValueDto extends SimpleValue {
-    List<VariableDto> getVariables();
+  @Override
+  List<VariableDto> getVariables();
 
-    void setVariables(List<VariableDto> variables);
+  void setVariables(List<VariableDto> variables);
 
-    SimpleValueDto withVariables(List<VariableDto> variables);
+  SimpleValueDto withVariables(List<VariableDto> variables);
 
-    String getValue();
+  @Override
+  String getString();
 
-    void setValue(String value);
+  void setString(String value);
 
-    SimpleValueDto withValue(String value);
+  SimpleValueDto withString(String value);
 }

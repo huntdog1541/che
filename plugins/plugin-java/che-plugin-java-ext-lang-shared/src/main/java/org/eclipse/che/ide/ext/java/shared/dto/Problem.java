@@ -1,107 +1,123 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.java.shared.dto;
 
-
+import java.util.List;
 import org.eclipse.che.dto.shared.DTO;
 
-import java.util.List;
-
 /**
- * DTO for {@link org.eclipse.jdt.core.compiler.IProblem}
- * Description of a Java problem, as detected by the compiler or some of the underlying
- * technology reusing the compiler.
+ * DTO for {@link org.eclipse.jdt.core.compiler.IProblem} Description of a Java problem, as detected
+ * by the compiler or some of the underlying technology reusing the compiler.
  *
  * @author Evgen Vidolob
  */
 @DTO
 public interface Problem {
-    /**
-     * Answer the file name in which the problem was found.
-     *
-     * @return the file name in which the problem was found
-     */
-    String getOriginatingFileName();
+  /**
+   * Answer the file name in which the problem was found.
+   *
+   * @return the file name in which the problem was found
+   */
+  String getOriginatingFileName();
 
-    void setOriginatingFileName(String originatingFileName);
+  void setOriginatingFileName(String originatingFileName);
 
-    /**
-     * Answer a localized, human-readable message string which describes the problem.
-     *
-     * @return a localized, human-readable message string which describes the problem
-     */
-    String getMessage();
+  Problem withOriginatingFileName(String originatingFileName);
 
-    void setMessage(String message);
+  /**
+   * Answer a localized, human-readable message string which describes the problem.
+   *
+   * @return a localized, human-readable message string which describes the problem
+   */
+  String getMessage();
 
-    /**
-     * Returns the problem id
-     *
-     * @return the problem id
-     */
-    int getID();
+  void setMessage(String message);
 
-    void setID(int ID);
+  Problem withMessage(String message);
 
-    /**
-     * Answer back the original arguments recorded into the problem.
-     *
-     * @return the original arguments recorded into the problem
-     */
-    List<String> getArguments();
+  /**
+   * Returns the problem id
+   *
+   * @return the problem id
+   */
+  int getID();
 
-    void setArguments(List<String> arguments);
+  void setID(int ID);
 
-    /**
-     * Answer the start position of the problem (inclusive), or -1 if unknown.
-     *
-     * @return the start position of the problem (inclusive), or -1 if unknown
-     */
-    int getSourceStart();
+  Problem withID(int ID);
 
-    void setSourceStart(int start);
+  /**
+   * Answer back the original arguments recorded into the problem.
+   *
+   * @return the original arguments recorded into the problem
+   */
+  List<String> getArguments();
 
-    /**
-     * Answer the end position of the problem (inclusive), or -1 if unknown.
-     *
-     * @return the end position of the problem (inclusive), or -1 if unknown
-     */
-    int getSourceEnd();
+  void setArguments(List<String> arguments);
 
-    void setSourceEnd(int end);
+  Problem withArguments(List<String> arguments);
 
-    /**
-     * Answer the line number in source where the problem begins.
-     *
-     * @return the line number in source where the problem begins
-     */
-    int getSourceLineNumber();
+  /**
+   * Answer the start position of the problem (inclusive), or -1 if unknown.
+   *
+   * @return the start position of the problem (inclusive), or -1 if unknown
+   */
+  int getSourceStart();
 
-    void setSourceLineNumber(int lineNumber);
+  void setSourceStart(int start);
 
-    /**
-     * Checks the severity to see if the Error bit is set.
-     *
-     * @return true if the Error bit is set for the severity, false otherwise
-     */
-    boolean isError();
+  Problem withSourceStart(int start);
 
-    void setError(boolean isError);
+  /**
+   * Answer the end position of the problem (inclusive), or -1 if unknown.
+   *
+   * @return the end position of the problem (inclusive), or -1 if unknown
+   */
+  int getSourceEnd();
 
-    /**
-     * Checks the severity to see if the Error bit is not set.
-     *
-     * @return true if the Error bit is not set for the severity, false otherwise
-     */
-    boolean isWarning();
+  void setSourceEnd(int end);
 
-    void setWarning(boolean isWarning);
+  Problem withSourceEnd(int end);
+
+  /**
+   * Answer the line number in source where the problem begins.
+   *
+   * @return the line number in source where the problem begins
+   */
+  int getSourceLineNumber();
+
+  void setSourceLineNumber(int lineNumber);
+
+  Problem withSourceLineNumber(int lineNumber);
+
+  /**
+   * Checks the severity to see if the Error bit is set.
+   *
+   * @return true if the Error bit is set for the severity, false otherwise
+   */
+  boolean isError();
+
+  void setError(boolean isError);
+
+  Problem withError(boolean isError);
+
+  /**
+   * Checks the severity to see if the Error bit is not set.
+   *
+   * @return true if the Error bit is not set for the severity, false otherwise
+   */
+  boolean isWarning();
+
+  void setWarning(boolean isWarning);
+
+  Problem withWarning(boolean isWarning);
 }

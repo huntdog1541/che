@@ -1,47 +1,46 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.java.client.refactoring.rename.wizard.similarnames;
 
-import com.google.gwtmockito.GwtMockitoTestRunner;
+import static org.mockito.Mockito.verify;
 
+import com.google.gwtmockito.GwtMockitoTestRunner;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 
-import static org.mockito.Mockito.verify;
-
 @RunWith(GwtMockitoTestRunner.class)
 public class SimilarNamesConfigurationPresenterTest {
-    @Mock
-    private SimilarNamesConfigurationView view;
+  @Mock private SimilarNamesConfigurationView view;
 
-    private SimilarNamesConfigurationPresenter presenter;
+  private SimilarNamesConfigurationPresenter presenter;
 
-    @Before
-    public void setUp() throws Exception {
-        presenter = new SimilarNamesConfigurationPresenter(view);
-    }
+  @Before
+  public void setUp() throws Exception {
+    presenter = new SimilarNamesConfigurationPresenter(view);
+  }
 
-    @Test
-    public void windowShouldBeShow() throws Exception {
-        presenter.show();
+  @Test
+  public void windowShouldBeShow() throws Exception {
+    presenter.show();
 
-        verify(view).show();
-    }
+    verify(view).showDialog();
+  }
 
-    @Test
-    public void valueOfStrategyShouldBeReturned() throws Exception {
-        presenter.getMachStrategy();
+  @Test
+  public void valueOfStrategyShouldBeReturned() throws Exception {
+    presenter.getMachStrategy();
 
-        verify(view).getMachStrategy();
-    }
+    verify(view).getMachStrategy();
+  }
 }

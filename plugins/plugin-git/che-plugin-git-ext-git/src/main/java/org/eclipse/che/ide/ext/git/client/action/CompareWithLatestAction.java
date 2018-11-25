@@ -1,138 +1,122 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.git.client.action;
+
+import static com.google.common.base.Preconditions.checkState;
+import static java.util.Collections.singletonList;
+import static org.eclipse.che.api.git.shared.DiffType.NAME_STATUS;
+import static org.eclipse.che.ide.api.notification.StatusNotification.DisplayMode.NOT_EMERGE_MODE;
+import static org.eclipse.che.ide.api.notification.StatusNotification.Status.FAIL;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-
-import org.eclipse.che.ide.api.git.GitServiceClient;
-import org.eclipse.che.api.workspace.shared.dto.ProjectConfigDto;
 import org.eclipse.che.ide.api.action.ActionEvent;
 import org.eclipse.che.ide.api.app.AppContext;
 import org.eclipse.che.ide.api.notification.NotificationManager;
-import org.eclipse.che.ide.api.project.node.HasStorablePath;
-import org.eclipse.che.ide.api.selection.Selection;
+import org.eclipse.che.ide.api.resources.Project;
+import org.eclipse.che.ide.api.resources.Resource;
 import org.eclipse.che.ide.ext.git.client.GitLocalizationConstant;
+import org.eclipse.che.ide.ext.git.client.GitServiceClient;
+import org.eclipse.che.ide.ext.git.client.compare.AlteredFiles;
 import org.eclipse.che.ide.ext.git.client.compare.ComparePresenter;
-import org.eclipse.che.ide.ext.git.client.compare.FileStatus.Status;
-import org.eclipse.che.ide.ext.git.client.compare.changedList.ChangedListPresenter;
-import org.eclipse.che.ide.part.explorer.project.ProjectExplorerPresenter;
-import org.eclipse.che.ide.project.node.ResourceBasedNode;
-import org.eclipse.che.ide.rest.AsyncRequestCallback;
-import org.eclipse.che.ide.rest.StringUnmarshaller;
-import org.eclipse.che.ide.api.dialogs.ConfirmCallback;
-import org.eclipse.che.ide.api.dialogs.DialogFactory;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.eclipse.che.api.git.shared.DiffRequest.DiffType.NAME_STATUS;
-import static org.eclipse.che.ide.api.notification.StatusNotification.DisplayMode.NOT_EMERGE_MODE;
-import static org.eclipse.che.ide.api.notification.StatusNotification.Status.FAIL;
-import static org.eclipse.che.ide.ext.git.client.compare.FileStatus.defineStatus;
+import org.eclipse.che.ide.ext.git.client.compare.changeslist.ChangesListPresenter;
+import org.eclipse.che.ide.ui.dialogs.DialogFactory;
 
 /**
  * Action for comparing with latest repository version
  *
  * @author Igor Vinokur
+ * @author Vlad Zhukovskyi
  */
 @Singleton
 public class CompareWithLatestAction extends GitAction {
-    private final ComparePresenter        comparePresenter;
-    private final ChangedListPresenter    changedListPresenter;
-    private final DialogFactory           dialogFactory;
-    private final NotificationManager     notificationManager;
-    private final GitServiceClient        gitService;
-    private final GitLocalizationConstant locale;
+  private final ComparePresenter comparePresenter;
+  private final ChangesListPresenter changesListPresenter;
+  private final DialogFactory dialogFactory;
+  private final NotificationManager notificationManager;
+  private final GitServiceClient service;
+  private final GitLocalizationConstant locale;
 
-    private final static String REVISION = "HEAD";
+  private static final String REVISION = "HEAD";
 
-    @Inject
-    public CompareWithLatestAction(ComparePresenter presenter,
-                                   ChangedListPresenter changedListPresenter,
-                                   AppContext appContext,
-                                   DialogFactory dialogFactory,
-                                   NotificationManager notificationManager,
-                                   GitServiceClient gitService,
-                                   GitLocalizationConstant constant,
-                                   ProjectExplorerPresenter projectExplorer) {
-        super(constant.compareWithLatestTitle(), constant.compareWithLatestTitle(), appContext, projectExplorer);
-        this.comparePresenter = presenter;
-        this.changedListPresenter = changedListPresenter;
-        this.dialogFactory = dialogFactory;
-        this.notificationManager = notificationManager;
-        this.gitService = gitService;
-        this.locale = constant;
-    }
+  @Inject
+  public CompareWithLatestAction(
+      ComparePresenter presenter,
+      ChangesListPresenter changesListPresenter,
+      AppContext appContext,
+      DialogFactory dialogFactory,
+      NotificationManager notificationManager,
+      GitServiceClient service,
+      GitLocalizationConstant constant) {
+    super(constant.compareWithLatestTitle(), constant.compareWithLatestTitle(), appContext);
+    this.comparePresenter = presenter;
+    this.changesListPresenter = changesListPresenter;
+    this.dialogFactory = dialogFactory;
+    this.notificationManager = notificationManager;
+    this.service = service;
+    this.locale = constant;
+  }
 
-    /** {@inheritDoc} */
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        ProjectConfigDto project = appContext.getCurrentProject().getRootProject();
-        String pattern;
-        String path;
+  /** {@inheritDoc} */
+  @Override
+  public void actionPerformed(ActionEvent e) {
 
-        Selection<ResourceBasedNode<?>> selection = getExplorerSelection();
+    final Project project = appContext.getRootProject();
+    final Resource resource = appContext.getResource();
 
-        if (selection == null || selection.getHeadElement() == null) {
-            path = project.getPath();
-        } else {
-            path = ((HasStorablePath)selection.getHeadElement()).getStorablePath();
-        }
+    checkState(project != null, "Null project occurred");
+    checkState(
+        project.getLocation().isPrefixOf(resource.getLocation()),
+        "Given selected item is not descendant of given project");
 
-        pattern = path.replaceFirst(project.getPath(), "");
-        pattern = (pattern.startsWith("/")) ? pattern.replaceFirst("/", "") : pattern;
+    final String selectedItemPath =
+        resource
+            .getLocation()
+            .removeFirstSegments(project.getLocation().segmentCount())
+            .removeTrailingSeparator()
+            .toString();
 
-        gitService.diff(appContext.getDevMachine(), project, Collections.singletonList(pattern), NAME_STATUS, false, 0, REVISION, false,
-                        new AsyncRequestCallback<String>(new StringUnmarshaller()) {
-                            @Override
-                            protected void onSuccess(String result) {
-                                if (result.isEmpty()) {
-                                    dialogFactory.createMessageDialog(locale.compareMessageIdenticalContentTitle(),
-                                                                      locale.compareMessageIdenticalContentText(), new ConfirmCallback() {
-                                                @Override
-                                                public void accepted() {
-                                                    //Do nothing
-                                                }
-                                            }).show();
-                                } else {
-                                    String[] changedFiles = result.split("\n");
-                                    if (changedFiles.length == 1) {
-                                        comparePresenter.show(changedFiles[0].substring(2),
-                                                              defineStatus(changedFiles[0].substring(0, 1)),
-                                                              REVISION);
-                                    } else {
-                                        Map<String, Status> items = new HashMap<>();
-                                        for (String item : changedFiles) {
-                                            items.put(item.substring(2, item.length()), defineStatus(item.substring(0, 1)));
-                                        }
-                                        changedListPresenter.show(items, REVISION);
-                                    }
-                                }
-                            }
+    service
+        .diff(
+            project.getLocation(),
+            selectedItemPath.isEmpty() ? null : singletonList(selectedItemPath),
+            NAME_STATUS,
+            false,
+            0,
+            REVISION,
+            false)
+        .then(
+            diff -> {
+              if (diff.isEmpty()) {
+                dialogFactory
+                    .createMessageDialog(
+                        locale.compareMessageIdenticalContentTitle(),
+                        locale.compareMessageIdenticalContentText(),
+                        null)
+                    .show();
+              } else {
+                AlteredFiles alteredFiles = new AlteredFiles(project, diff);
+                if (alteredFiles.getFilesQuantity() == 1) {
 
-                            @Override
-                            protected void onFailure(Throwable exception) {
-                                notificationManager.notify(locale.diffFailed(), FAIL, NOT_EMERGE_MODE);
-                            }
-                        });
-    }
+                  comparePresenter.showCompareWithLatest(alteredFiles, null, REVISION);
+                } else {
 
-    private Selection<ResourceBasedNode<?>> getExplorerSelection() {
-        final Selection<ResourceBasedNode<?>> selection = (Selection<ResourceBasedNode<?>>)projectExplorer.getSelection();
-        if (selection == null || selection.isEmpty() || selection.getHeadElement() instanceof HasStorablePath) {
-            return selection;
-        } else {
-            return null;
-        }
-    }
+                  changesListPresenter.show(alteredFiles, REVISION, null);
+                }
+              }
+            })
+        .catchError(
+            arg -> {
+              notificationManager.notify(locale.diffFailed(), FAIL, NOT_EMERGE_MODE);
+            });
+  }
 }

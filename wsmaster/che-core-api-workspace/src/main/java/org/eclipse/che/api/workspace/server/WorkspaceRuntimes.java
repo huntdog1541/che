@@ -1,67 +1,89 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.workspace.server;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Predicate;
+import static com.google.common.base.MoreObjects.firstNonNull;
+import static java.lang.String.format;
+import static java.lang.System.currentTimeMillis;
+import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toSet;
+import static org.eclipse.che.api.core.model.workspace.WorkspaceStatus.RUNNING;
+import static org.eclipse.che.api.core.model.workspace.WorkspaceStatus.STARTING;
+import static org.eclipse.che.api.core.model.workspace.WorkspaceStatus.STOPPED;
+import static org.eclipse.che.api.core.model.workspace.WorkspaceStatus.STOPPING;
+import static org.eclipse.che.api.workspace.shared.Constants.ERROR_MESSAGE_ATTRIBUTE_NAME;
+import static org.eclipse.che.api.workspace.shared.Constants.STOPPED_ABNORMALLY_ATTRIBUTE_NAME;
+import static org.eclipse.che.api.workspace.shared.Constants.STOPPED_ATTRIBUTE_NAME;
+import static org.eclipse.che.api.workspace.shared.Constants.WORKSPACE_RUNTIMES_ID_ATTRIBUTE;
+import static org.eclipse.che.api.workspace.shared.Constants.WORKSPACE_STOPPED_BY;
 
-import org.eclipse.che.api.core.BadRequestException;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
+import com.google.common.collect.Sets.SetView;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
+import javax.inject.Singleton;
 import org.eclipse.che.api.core.ConflictException;
 import org.eclipse.che.api.core.NotFoundException;
 import org.eclipse.che.api.core.ServerException;
-import org.eclipse.che.api.core.model.machine.MachineConfig;
-import org.eclipse.che.api.core.model.workspace.WorkspaceRuntime;
+import org.eclipse.che.api.core.ValidationException;
+import org.eclipse.che.api.core.model.workspace.Workspace;
 import org.eclipse.che.api.core.model.workspace.WorkspaceStatus;
+import org.eclipse.che.api.core.model.workspace.config.Environment;
+import org.eclipse.che.api.core.model.workspace.runtime.RuntimeIdentity;
 import org.eclipse.che.api.core.notification.EventService;
-import org.eclipse.che.api.machine.server.MachineManager;
-import org.eclipse.che.api.machine.server.exception.MachineException;
-import org.eclipse.che.api.machine.server.exception.SnapshotException;
-import org.eclipse.che.api.machine.server.model.impl.MachineConfigImpl;
-import org.eclipse.che.api.machine.server.model.impl.MachineImpl;
+import org.eclipse.che.api.core.notification.EventSubscriber;
+import org.eclipse.che.api.workspace.server.hc.probe.ProbeScheduler;
 import org.eclipse.che.api.workspace.server.model.impl.EnvironmentImpl;
+import org.eclipse.che.api.workspace.server.model.impl.RuntimeIdentityImpl;
+import org.eclipse.che.api.workspace.server.model.impl.RuntimeImpl;
 import org.eclipse.che.api.workspace.server.model.impl.WorkspaceImpl;
-import org.eclipse.che.api.workspace.server.model.impl.WorkspaceRuntimeImpl;
+import org.eclipse.che.api.workspace.server.spi.InfrastructureException;
+import org.eclipse.che.api.workspace.server.spi.InternalInfrastructureException;
+import org.eclipse.che.api.workspace.server.spi.InternalRuntime;
+import org.eclipse.che.api.workspace.server.spi.RuntimeContext;
+import org.eclipse.che.api.workspace.server.spi.RuntimeInfrastructure;
+import org.eclipse.che.api.workspace.server.spi.RuntimeStartInterruptedException;
+import org.eclipse.che.api.workspace.server.spi.WorkspaceDao;
+import org.eclipse.che.api.workspace.server.spi.environment.InternalEnvironment;
+import org.eclipse.che.api.workspace.server.spi.environment.InternalEnvironmentFactory;
+import org.eclipse.che.api.workspace.server.wsnext.WorkspaceNextApplier;
+import org.eclipse.che.api.workspace.server.wsnext.WorkspaceNextObjectsRetriever;
+import org.eclipse.che.api.workspace.server.wsnext.model.ChePlugin;
+import org.eclipse.che.api.workspace.shared.dto.event.RuntimeStatusEvent;
 import org.eclipse.che.api.workspace.shared.dto.event.WorkspaceStatusEvent;
-import org.eclipse.che.api.workspace.shared.dto.event.WorkspaceStatusEvent.EventType;
+import org.eclipse.che.commons.env.EnvironmentContext;
+import org.eclipse.che.commons.lang.NameGenerator;
+import org.eclipse.che.commons.lang.concurrent.ThreadLocalPropagateContext;
+import org.eclipse.che.commons.lang.concurrent.Unlocker;
+import org.eclipse.che.commons.subject.Subject;
+import org.eclipse.che.core.db.DBInitializer;
+import org.eclipse.che.dto.server.DtoFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.PreDestroy;
-import javax.inject.Inject;
-import javax.inject.Singleton;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Queue;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import static java.lang.String.format;
-import static org.eclipse.che.dto.server.DtoFactory.newDto;
-
 /**
- * Defines an internal API for managing {@link WorkspaceRuntimeImpl} instances.
- *
- * <p>This component implements {@link WorkspaceStatus} spec.
- *
- * <p>All the operations performed by this component are synchronous.
- *
- * <p>The implementation is thread-safe and guarded by {@link ReentrantReadWriteLock rwLock}.
- *
- * <p>The implementation doesn't validate parameters.
- * Parameters should be validated by caller of methods of this class.
+ * Defines an internal API for managing {@link RuntimeImpl} instances.
  *
  * @author Yevhenii Voevodin
  * @author Alexander Garagatyi
@@ -69,485 +91,732 @@ import static org.eclipse.che.dto.server.DtoFactory.newDto;
 @Singleton
 public class WorkspaceRuntimes {
 
-    private static final Logger LOG = LoggerFactory.getLogger(WorkspaceRuntimes.class);
+  private static final Logger LOG = LoggerFactory.getLogger(WorkspaceRuntimes.class);
 
-    private final ReadWriteLock                         rwLock;
-    private final Map<String, RuntimeDescriptor>        descriptors;
-    private final Map<String, Queue<MachineConfigImpl>> startQueues;
-    private final MachineManager                        machineManager;
-    private final EventService                          eventService;
+  private ConcurrentMap<String, InternalRuntime<?>> runtimes;
+  private final WorkspaceStatusCache statuses;
+  private final WorkspaceLockService lockService;
+  private final EventService eventService;
+  private final WorkspaceSharedPool sharedPool;
+  private final WorkspaceDao workspaceDao;
+  private final AtomicBoolean isStartRefused;
+  private final Map<String, InternalEnvironmentFactory> environmentFactories;
+  private final RuntimeInfrastructure infrastructure;
+  private final ProbeScheduler probeScheduler;
+  // Unique identifier for this workspace runtimes
+  private final String workspaceRuntimesId;
+  private final Map<String, WorkspaceNextApplier> workspaceNextAppliers;
+  private final WorkspaceNextObjectsRetriever workspaceNextObjectsRetriever;
 
-    private volatile boolean isPreDestroyInvoked;
+  @VisibleForTesting
+  WorkspaceRuntimes(
+      ConcurrentMap<String, InternalRuntime<?>> runtimes,
+      EventService eventService,
+      Map<String, InternalEnvironmentFactory> envFactories,
+      RuntimeInfrastructure infra,
+      WorkspaceSharedPool sharedPool,
+      WorkspaceDao workspaceDao,
+      @SuppressWarnings("unused") DBInitializer ignored,
+      ProbeScheduler probeScheduler,
+      WorkspaceStatusCache statuses,
+      WorkspaceLockService lockService,
+      Map<String, WorkspaceNextApplier> workspaceNextAppliers,
+      WorkspaceNextObjectsRetriever workspaceNextObjectsRetriever) {
+    this(
+        eventService,
+        envFactories,
+        infra,
+        sharedPool,
+        workspaceDao,
+        ignored,
+        probeScheduler,
+        statuses,
+        lockService,
+        workspaceNextAppliers,
+        workspaceNextObjectsRetriever);
+    this.runtimes = runtimes;
+  }
 
-    @Inject
-    public WorkspaceRuntimes(MachineManager machineManager, EventService eventService) {
-        this.machineManager = machineManager;
-        this.eventService = eventService;
-        this.descriptors = new HashMap<>();
-        this.startQueues = new HashMap<>();
-        this.rwLock = new ReentrantReadWriteLock();
+  @Inject
+  public WorkspaceRuntimes(
+      EventService eventService,
+      Map<String, InternalEnvironmentFactory> envFactories,
+      RuntimeInfrastructure infra,
+      WorkspaceSharedPool sharedPool,
+      WorkspaceDao workspaceDao,
+      @SuppressWarnings("unused") DBInitializer ignored,
+      ProbeScheduler probeScheduler,
+      WorkspaceStatusCache statuses,
+      WorkspaceLockService lockService,
+      Map<String, WorkspaceNextApplier> workspaceNextAppliers,
+      WorkspaceNextObjectsRetriever workspaceNextObjectsRetriever) {
+    this.probeScheduler = probeScheduler;
+    this.runtimes = new ConcurrentHashMap<>();
+    this.statuses = statuses;
+    this.eventService = eventService;
+    this.sharedPool = sharedPool;
+    this.workspaceDao = workspaceDao;
+    this.isStartRefused = new AtomicBoolean(false);
+    this.infrastructure = infra;
+    this.environmentFactories = ImmutableMap.copyOf(envFactories);
+    this.lockService = lockService;
+    this.workspaceNextAppliers = ImmutableMap.copyOf(workspaceNextAppliers);
+    this.workspaceNextObjectsRetriever = workspaceNextObjectsRetriever;
+    LOG.info("Configured factories for environments: '{}'", envFactories.keySet());
+    LOG.info("Registered infrastructure '{}'", infra.getName());
+    SetView<String> notSupportedByInfra =
+        Sets.difference(envFactories.keySet(), infra.getRecipeTypes());
+    if (!notSupportedByInfra.isEmpty()) {
+      LOG.warn(
+          "Configured environment(s) are not supported by infrastructure: '{}'",
+          notSupportedByInfra);
     }
+    workspaceRuntimesId = NameGenerator.generate("runtimes", 16);
+  }
 
-    /**
-     * Returns the runtime descriptor describing currently starting/running/stopping
-     * workspace runtime.
-     *
-     * <p>Note that the {@link RuntimeDescriptor#getRuntime()} method
-     * returns {@link Optional} which describes just a snapshot copy of
-     * a real {@code WorkspaceRuntime} object, which means that any
-     * runtime copy modifications won't affect the real object and also
-     * it means that copy won't be affected with modifications applied
-     * to the real runtime workspace object state.
-     *
-     * @param workspaceId
-     *         the id of the workspace to get its runtime
-     * @return descriptor which describes current state of the workspace runtime
-     * @throws NotFoundException
-     *         when workspace with given {@code workspaceId} doesn't have runtime
-     */
-    public RuntimeDescriptor get(String workspaceId) throws NotFoundException {
-        rwLock.readLock().lock();
+  @PostConstruct
+  void init() {
+    subscribeAbnormalRuntimeStopListener();
+    recover();
+  }
+
+  public void validate(Environment environment)
+      throws NotFoundException, InfrastructureException, ValidationException {
+    String type = environment.getRecipe().getType();
+    if (!infrastructure.getRecipeTypes().contains(type)) {
+      throw new NotFoundException("Infrastructure not found for type: " + type);
+    }
+    // try to create internal environment to check if the specified environment is valid
+    createInternalEnvironment(environment, null);
+  }
+
+  /**
+   * Injects runtime information such as status and {@link
+   * org.eclipse.che.api.core.model.workspace.Runtime} into the workspace object, if the workspace
+   * doesn't have runtime sets the status to {@link WorkspaceStatus#STOPPED}.
+   *
+   * @param workspace the workspace to inject runtime into
+   */
+  public void injectRuntime(WorkspaceImpl workspace) throws ServerException {
+    try (Unlocker ignored = lockService.writeLock(workspace.getId())) {
+      WorkspaceStatus workspaceStatus = statuses.get(workspace.getId());
+
+      if (workspaceStatus == null) {
+        workspace.setStatus(STOPPED);
+        return;
+      }
+
+      InternalRuntime<?> internalRuntime;
+      try {
+        internalRuntime = getInternalRuntime(workspace.getId());
+      } catch (ServerException | InfrastructureException e) {
+        workspace.setStatus(STOPPED);
+        return;
+      }
+
+      workspace.setRuntime(asRuntime(internalRuntime));
+      workspace.setStatus(workspaceStatus);
+    }
+  }
+
+  private InternalRuntime<?> getInternalRuntime(String workspaceId)
+      throws InfrastructureException, ServerException {
+    try (Unlocker ignored = lockService.writeLock(workspaceId)) {
+      InternalRuntime<?> runtime = runtimes.get(workspaceId);
+      if (runtime == null) {
         try {
-            final RuntimeDescriptor descriptor = descriptors.get(workspaceId);
-            if (descriptor == null) {
-                throw new NotFoundException("Workspace with id '" + workspaceId + "' is not running.");
-            }
-            return new RuntimeDescriptor(descriptor);
-        } finally {
-            rwLock.readLock().unlock();
+          final Optional<RuntimeIdentity> runtimeIdentity =
+              infrastructure
+                  .getIdentities()
+                  .stream()
+                  .filter(id -> id.getWorkspaceId().equals(workspaceId))
+                  .findAny();
+
+          if (runtimeIdentity.isPresent()) {
+            runtime = recoverOne(infrastructure, runtimeIdentity.get());
+          } else {
+            // runtime is not considered by Infrastructure as active
+            throw new ServerException("No active runtime is found");
+          }
+        } catch (ServerException e) {
+          statuses.remove(workspaceId);
+          throw e;
+        } catch (UnsupportedOperationException | ConflictException e) {
+          statuses.remove(workspaceId);
+          throw new ServerException(e.getMessage(), e);
         }
+      }
+      return runtime;
+    }
+  }
+
+  private static RuntimeImpl asRuntime(InternalRuntime<?> runtime) throws ServerException {
+    try {
+      return new RuntimeImpl(runtime.getActiveEnv(), runtime.getMachines(), runtime.getOwner());
+    } catch (InfrastructureException e) {
+      throw new ServerException(e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Gets workspace status by its identifier.
+   *
+   * @param workspaceId workspace identifier
+   */
+  public WorkspaceStatus getStatus(String workspaceId) {
+    try (Unlocker ignored = lockService.readLock(workspaceId)) {
+      final WorkspaceStatus status = statuses.get(workspaceId);
+      return status != null ? status : STOPPED;
+    }
+  }
+
+  /**
+   * Starts all machines from specified workspace environment, creates workspace runtime instance
+   * based on that environment.
+   *
+   * <p>During the start of the workspace its runtime is visible with {@link
+   * WorkspaceStatus#STARTING} status.
+   *
+   * @param workspace workspace which environment should be started
+   * @param envName the name of the environment to start
+   * @param options whether machines should be recovered(true) or not(false)
+   * @return completable future of start execution.
+   * @throws ConflictException when workspace is already running
+   * @throws ConflictException when start is interrupted
+   * @throws NotFoundException when any not found exception occurs during environment start
+   * @throws ServerException other error occurs during environment start
+   * @see WorkspaceStatus#STARTING
+   * @see WorkspaceStatus#RUNNING
+   */
+  public CompletableFuture<Void> startAsync(
+      Workspace workspace, String envName, Map<String, String> options)
+      throws ConflictException, NotFoundException, ServerException {
+
+    final EnvironmentImpl environment = copyEnv(workspace, envName);
+    final String workspaceId = workspace.getId();
+
+    requireNonNull(environment, "Environment should not be null " + workspaceId);
+    requireNonNull(environment.getRecipe(), "Recipe should not be null " + workspaceId);
+    requireNonNull(
+        environment.getRecipe().getType(), "Recipe type should not be null " + workspaceId);
+
+    if (isStartRefused.get()) {
+      throw new ConflictException(
+          format(
+              "Start of the workspace '%s' is rejected by the system, "
+                  + "no more workspaces are allowed to start",
+              workspace.getConfig().getName()));
     }
 
-    /**
-     * Starts all machines from specified workspace environment,
-     * creates workspace runtime instance based on that environment.
-     *
-     * <p>Dev-machine always starts before the other machines.
-     * If dev-machine start failed then method will throw appropriate
-     * {@link ServerException}. During the start of the workspace its
-     * runtime is visible with {@link WorkspaceStatus#STARTING} status.
-     *
-     * <p>If {@link #stop} method executed after dev machine is started but
-     * another machines haven't been started yet then {@link ConflictException}
-     * will be thrown and start process will be interrupted.
-     *
-     * <p>Note that it doesn't provide any events for
-     * machines start, Machine API is responsible for it.
-     *
-     * @param workspace
-     *         workspace which environment should be started
-     * @param envName
-     *         the name of the environment to start
-     * @param recover
-     *         whether machines should be recovered(true) or not(false)
-     * @return the workspace runtime instance with machines set.
-     * @throws ConflictException
-     *         when workspace is already running
-     * @throws ConflictException
-     *         when start is interrupted
-     * @throws NotFoundException
-     *         when any not found exception occurs during environment start
-     * @throws ServerException
-     *         when component {@link #isPreDestroyInvoked is stopped} or any
-     *         other error occurs during environment start
-     * @see MachineManager#createMachineSync(MachineConfig, String, String)
-     * @see WorkspaceStatus#STARTING
-     * @see WorkspaceStatus#RUNNING
-     */
-    public RuntimeDescriptor start(WorkspaceImpl workspace, String envName, boolean recover) throws ServerException,
-                                                                                                    ConflictException,
-                                                                                                    NotFoundException {
-        final EnvironmentImpl activeEnv = new EnvironmentImpl(workspace.getConfig().getEnvironment(envName).get());
-        ensurePreDestroyIsNotExecuted();
-        rwLock.writeLock().lock();
-        try {
-            ensurePreDestroyIsNotExecuted();
-            final RuntimeDescriptor descriptor = descriptors.get(workspace.getId());
-            if (descriptor != null) {
-                throw new ConflictException(format("Could not start workspace '%s' because its status is '%s'",
-                                                   workspace.getConfig().getName(),
-                                                   descriptor.getRuntimeStatus()));
-            }
-            descriptors.put(workspace.getId(), new RuntimeDescriptor(new WorkspaceRuntimeImpl(envName)));
-            // Dev machine goes first in the start queue
-            final List<MachineConfigImpl> machineConfigs = activeEnv.getMachineConfigs();
-            final MachineConfigImpl devCfg = rmFirst(machineConfigs, MachineConfig::isDev);
-            machineConfigs.add(0, devCfg);
-            startQueues.put(workspace.getId(), new ArrayDeque<>(machineConfigs));
-        } finally {
-            rwLock.writeLock().unlock();
+    final String ownerId = EnvironmentContext.getCurrent().getSubject().getUserId();
+    final RuntimeIdentity runtimeId = new RuntimeIdentityImpl(workspaceId, envName, ownerId);
+    try {
+      InternalEnvironment internalEnv =
+          createInternalEnvironment(environment, workspace.getConfig().getAttributes());
+      RuntimeContext runtimeContext = infrastructure.prepare(runtimeId, internalEnv);
+      InternalRuntime runtime = runtimeContext.getRuntime();
+
+      try (Unlocker ignored = lockService.writeLock(workspaceId)) {
+        final WorkspaceStatus existingStatus = statuses.putIfAbsent(workspaceId, STARTING);
+        if (existingStatus != null) {
+          throw new ConflictException(
+              format(
+                  "Could not start workspace '%s' because its state is '%s'",
+                  workspaceId, existingStatus));
         }
-        startQueue(workspace.getId(), activeEnv.getName(), recover);
-        return get(workspace.getId());
+        setRuntimesId(workspaceId);
+        runtimes.put(workspaceId, runtime);
+      }
+      LOG.info(
+          "Starting workspace '{}/{}' with id '{}' by user '{}'",
+          workspace.getNamespace(),
+          workspace.getConfig().getName(),
+          workspace.getId(),
+          sessionUserNameOr("undefined"));
+
+      publishWorkspaceStatusEvent(workspaceId, STARTING, STOPPED, null);
+      return CompletableFuture.runAsync(
+          ThreadLocalPropagateContext.wrap(new StartRuntimeTask(workspace, options, runtime)),
+          sharedPool.getExecutor());
+    } catch (ValidationException e) {
+      LOG.error(e.getLocalizedMessage(), e);
+      throw new ConflictException(e.getLocalizedMessage());
+    } catch (InfrastructureException e) {
+      LOG.error(e.getLocalizedMessage(), e);
+      throw new ServerException(e.getLocalizedMessage(), e);
+    }
+  }
+
+  private class StartRuntimeTask implements Runnable {
+
+    private final Workspace workspace;
+    private final Map<String, String> options;
+    private final InternalRuntime runtime;
+
+    public StartRuntimeTask(
+        Workspace workspace, Map<String, String> options, InternalRuntime runtime) {
+      this.workspace = workspace;
+      this.options = options;
+      this.runtime = runtime;
     }
 
-    /**
-     * This method is similar to the {@link #start(WorkspaceImpl, String, boolean)} method
-     * except that it doesn't recover workspace and always starts a new one.
-     */
-    public RuntimeDescriptor start(WorkspaceImpl workspace, String envName) throws ServerException,
-                                                                                   ConflictException,
-                                                                                   NotFoundException {
-        return start(workspace, envName, false);
+    @Override
+    public void run() {
+      String workspaceId = workspace.getId();
+      try {
+        runtime.start(options);
+        try (Unlocker ignored = lockService.writeLock(workspaceId)) {
+          statuses.replace(workspaceId, RUNNING);
+        }
+
+        LOG.info(
+            "Workspace '{}:{}' with id '{}' started by user '{}'",
+            workspace.getNamespace(),
+            workspace.getConfig().getName(),
+            workspaceId,
+            sessionUserNameOr("undefined"));
+        publishWorkspaceStatusEvent(workspaceId, RUNNING, STARTING, null);
+      } catch (InfrastructureException e) {
+        try (Unlocker ignored = lockService.writeLock(workspaceId)) {
+          runtimes.remove(workspaceId);
+          statuses.remove(workspaceId);
+        }
+        // Cancels workspace servers probes if any
+        probeScheduler.cancel(workspaceId);
+
+        String failureCause = "failed";
+        if (e instanceof RuntimeStartInterruptedException) {
+          failureCause = "interrupted";
+        }
+        LOG.info(
+            "Workspace '{}:{}' with id '{}' start {}",
+            workspace.getNamespace(),
+            workspace.getConfig().getName(),
+            workspaceId,
+            failureCause);
+        // InfrastructureException is supposed to be an exception that can't be solved
+        // by Che admin, so should not be logged (but not InternalInfrastructureException).
+        // It will prevent bothering the admin when user made a mistake in WS configuration.
+        if (e instanceof InternalInfrastructureException) {
+          LOG.error(e.getLocalizedMessage(), e);
+        }
+        publishWorkspaceStatusEvent(workspaceId, STOPPED, STARTING, e.getMessage());
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  /**
+   * Stops running workspace runtime asynchronously.
+   *
+   * <p>Stops environment in an implementation specific way. During the stop of the workspace its
+   * runtime is accessible with {@link WorkspaceStatus#STOPPING stopping} status. Workspace may be
+   * stopped only if its status is {@link WorkspaceStatus#RUNNING} or {@link
+   * WorkspaceStatus#STARTING}.
+   *
+   * @param workspace workspace which runtime should be stopped
+   * @throws NotFoundException when workspace with specified identifier does not have runtime
+   * @throws ConflictException when running workspace status is different from {@link
+   *     WorkspaceStatus#RUNNING} or {@link WorkspaceStatus#STARTING}
+   * @see WorkspaceStatus#STOPPING
+   */
+  public CompletableFuture<Void> stopAsync(Workspace workspace, Map<String, String> options)
+      throws NotFoundException, ConflictException {
+    String workspaceId = workspace.getId();
+    WorkspaceStatus status = statuses.get(workspaceId);
+    if (status == null) {
+      throw new NotFoundException("Workspace with id '" + workspaceId + "' is not running.");
+    }
+    if (status != RUNNING && status != STARTING) {
+      throw new ConflictException(
+          format("Could not stop workspace '%s' because its state is '%s'", workspaceId, status));
+    }
+    if (!statuses.replace(workspaceId, status, STOPPING)) {
+      WorkspaceStatus newStatus = statuses.get(workspaceId);
+      throw new ConflictException(
+          format(
+              "Could not stop workspace '%s' because its state is '%s'",
+              workspaceId, newStatus == null ? STOPPED : newStatus));
+    }
+    setRuntimesId(workspaceId);
+
+    String stoppedBy =
+        firstNonNull(
+            sessionUserNameOr(workspace.getAttributes().get(WORKSPACE_STOPPED_BY)), "undefined");
+    LOG.info(
+        "Workspace '{}/{}' with id '{}' is being stopped by user '{}'",
+        workspace.getNamespace(),
+        workspace.getConfig().getName(),
+        workspace.getId(),
+        stoppedBy);
+    publishWorkspaceStatusEvent(workspaceId, STOPPING, status, null);
+    return CompletableFuture.runAsync(
+        ThreadLocalPropagateContext.wrap(new StopRuntimeTask(workspace, options, stoppedBy)),
+        sharedPool.getExecutor());
+  }
+
+  private class StopRuntimeTask implements Runnable {
+
+    private final Workspace workspace;
+    private final Map<String, String> options;
+    private final String stoppedBy;
+
+    public StopRuntimeTask(Workspace workspace, Map<String, String> options, String stoppedBy) {
+      this.workspace = workspace;
+      this.options = options;
+      this.stoppedBy = stoppedBy;
     }
 
+    @Override
+    public void run() {
+      String workspaceId = workspace.getId();
+      // Cancels workspace servers probes if any
+      probeScheduler.cancel(workspaceId);
+      try {
+        InternalRuntime<?> runtime = getInternalRuntime(workspaceId);
 
-    /**
-     * Stops running workspace runtime.
-     *
-     * <p>Stops all running machines one by one,
-     * non-dev machines first. During the stop of the workspace
-     * its runtime is accessible with {@link WorkspaceStatus#STOPPING stopping} status.
-     * Workspace may be stopped only if its status is {@link WorkspaceStatus#RUNNING}.
-     *
-     * <p>If workspace has runtime with dev-machine running
-     * and other machines starting then the runtime can still
-     * be stopped which will also interrupt starting process.
-     *
-     * <p>Note that it doesn't provide any events for machines stop,
-     * Machine API is responsible for it.
-     *
-     * @param workspaceId
-     *         identifier of workspace which should be stopped
-     * @throws NotFoundException
-     *         when workspace with specified identifier is not running
-     * @throws ServerException
-     *         when any error occurs during workspace stopping
-     * @throws ConflictException
-     *         when running workspace status is different from {@link WorkspaceStatus#RUNNING}
-     * @see MachineManager#destroy(String, boolean)
-     * @see WorkspaceStatus#STOPPING
-     */
-    public void stop(String workspaceId) throws NotFoundException, ServerException, ConflictException {
-        ensurePreDestroyIsNotExecuted();
-        rwLock.writeLock().lock();
-        final WorkspaceRuntimeImpl runtime;
-        try {
-            ensurePreDestroyIsNotExecuted();
-            final RuntimeDescriptor descriptor = descriptors.get(workspaceId);
-            if (descriptor == null) {
-                throw new NotFoundException("Workspace with id '" + workspaceId + "' is not running.");
-            }
-            if (descriptor.getRuntimeStatus() != WorkspaceStatus.RUNNING) {
-                throw new ConflictException(format("Couldn't stop '%s' workspace because its status is '%s'",
-                                                   workspaceId,
-                                                   descriptor.getRuntimeStatus()));
-            }
-            descriptor.setStopping();
-            // remove the workspace from the queue to prevent start
-            // of another not started machines(if such exist)
-            startQueues.remove(workspaceId);
-            runtime = descriptor.getRuntime();
-        } finally {
-            rwLock.writeLock().unlock();
+        runtime.stop(options);
+
+        // remove before firing an event to have consistency between state and the event
+        try (Unlocker ignored = lockService.writeLock(workspaceId)) {
+          runtimes.remove(workspaceId);
+          statuses.remove(workspaceId);
         }
-        destroyRuntime(workspaceId, runtime);
+        LOG.info(
+            "Workspace '{}/{}' with id '{}' stopped by user '{}'",
+            workspace.getNamespace(),
+            workspace.getConfig().getName(),
+            workspaceId,
+            stoppedBy);
+        publishWorkspaceStatusEvent(workspaceId, STOPPED, STOPPING, null);
+      } catch (ServerException | InfrastructureException e) {
+        // remove before firing an event to have consistency between state and the event
+        try (Unlocker ignored = lockService.writeLock(workspaceId)) {
+          runtimes.remove(workspaceId);
+          statuses.remove(workspaceId);
+        }
+        LOG.info(
+            "Error occurs on workspace '{}/{}' with id '{}' stopped by user '{}'. Error: {}",
+            workspace.getNamespace(),
+            workspace.getConfig().getName(),
+            workspaceId,
+            stoppedBy,
+            e);
+        publishWorkspaceStatusEvent(
+            workspaceId,
+            STOPPED,
+            STOPPING,
+            "Error occurs on workspace runtime stop. Error: " + e.getMessage());
+        // InfrastructureException is supposed to be an exception that can't be solved
+        // by Che admin, so should not be logged (but not InternalInfrastructureException).
+        // It will prevent bothering the admin when user made a mistake in WS configuration.
+        if (e instanceof InternalInfrastructureException) {
+          LOG.error(e.getLocalizedMessage(), e);
+        }
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  /**
+   * Returns true if workspace was started and its status is {@link WorkspaceStatus#RUNNING
+   * running}, {@link WorkspaceStatus#STARTING starting} or {@link WorkspaceStatus#STOPPING
+   * stopping} - otherwise returns false.
+   *
+   * @param workspaceId workspace identifier to perform check
+   * @return true if workspace is running, otherwise false
+   */
+  public boolean hasRuntime(String workspaceId) {
+    return statuses.get(workspaceId) != null;
+  }
+
+  @VisibleForTesting
+  void recover() {
+    if (isStartRefused.get()) {
+      LOG.warn("Recovery of the workspaces is rejected.");
+      return;
+    }
+    try {
+      for (RuntimeIdentity identity : infrastructure.getIdentities()) {
+        recoverOne(infrastructure, identity);
+      }
+    } catch (UnsupportedOperationException x) {
+      LOG.warn("Not recoverable infrastructure: '{}'", infrastructure.getName());
+    } catch (InternalInfrastructureException x) {
+      LOG.error(
+          format(
+              "An error occurred while attempted to recover runtimes using infrastructure '%s'",
+              infrastructure.getName()),
+          x);
+    } catch (ConflictException | ServerException | InfrastructureException x) {
+      LOG.error(
+          "An error occurred while attempted to recover runtimes using infrastructure '{}'. Reason: '{}'",
+          infrastructure.getName(),
+          x.getMessage());
+    }
+  }
+
+  @VisibleForTesting
+  InternalRuntime<?> recoverOne(RuntimeInfrastructure infra, RuntimeIdentity identity)
+      throws ServerException, ConflictException {
+    if (isStartRefused.get()) {
+      throw new ConflictException(
+          format(
+              "Recovery of the workspace '%s' is rejected by the system, "
+                  + "no more workspaces are allowed to start",
+              identity.getWorkspaceId()));
+    }
+    Workspace workspace;
+    try {
+      workspace = workspaceDao.get(identity.getWorkspaceId());
+    } catch (NotFoundException x) {
+      throw new ServerException(
+          format(
+              "Workspace configuration is missing for the runtime '%s:%s'. Runtime won't be recovered",
+              identity.getWorkspaceId(), identity.getEnvName()));
     }
 
-    /**
-     * Returns true if workspace was started and its status is
-     * {@link WorkspaceStatus#RUNNING running}, {@link WorkspaceStatus#STARTING starting}
-     * or {@link WorkspaceStatus#STOPPING stopping} - otherwise returns false.
-     *
-     * <p> This method is less expensive alternative to {@link #get(String)} + {@code try catch}, see example:
-     * <pre>{@code
-     *
-     *     if (!runtimes.hasRuntime("workspace123")) {
-     *         doStuff("workspace123");
-     *     }
-     *
-     *     //vs
-     *
-     *     try {
-     *         runtimes.get("workspace123");
-     *     } catch (NotFoundException ex) {
-     *         doStuff("workspace123");
-     *     }
-     *
-     * }</pre>
-     *
-     * @param workspaceId
-     *         workspace identifier to perform check
-     * @return true if workspace is running, otherwise false
-     */
-    public boolean hasRuntime(String workspaceId) {
-        rwLock.readLock().lock();
-        try {
-            return descriptors.containsKey(workspaceId);
-        } finally {
-            rwLock.readLock().unlock();
-        }
+    Environment environment = workspace.getConfig().getEnvironments().get(identity.getEnvName());
+    if (environment == null) {
+      throw new ServerException(
+          format(
+              "Environment configuration is missing for the runtime '%s:%s'. Runtime won't be recovered",
+              identity.getWorkspaceId(), identity.getEnvName()));
     }
 
-    /**
-     * Removes all descriptors from the in-memory storage, while
-     * {@link MachineManager#cleanup()} is responsible for machines destroying.
-     */
-    @PreDestroy
-    @VisibleForTesting
-    void cleanup() {
-        isPreDestroyInvoked = true;
-        rwLock.writeLock().lock();
-        try {
-            descriptors.clear();
-            startQueues.clear();
-        } finally {
-            rwLock.writeLock().unlock();
+    InternalRuntime runtime;
+    try {
+      InternalEnvironment internalEnv =
+          createInternalEnvironment(environment, workspace.getConfig().getAttributes());
+      runtime = infra.prepare(identity, internalEnv).getRuntime();
+
+      try (Unlocker ignored = lockService.writeLock(workspace.getId())) {
+        statuses.putIfAbsent(identity.getWorkspaceId(), runtime.getStatus());
+        runtimes.put(identity.getWorkspaceId(), runtime);
+      }
+      LOG.info(
+          "Successfully recovered workspace runtime '{}'",
+          identity.getWorkspaceId(),
+          identity.getEnvName());
+      return runtime;
+    } catch (InfrastructureException | ValidationException | NotFoundException x) {
+      throw new ServerException(
+          format(
+              "Couldn't recover runtime '%s:%s'. Error: %s",
+              identity.getWorkspaceId(), identity.getEnvName(), x.getMessage()));
+    }
+  }
+
+  private void subscribeAbnormalRuntimeStopListener() {
+    eventService.subscribe(new AbnormalRuntimeStopListener());
+  }
+
+  private void publishWorkspaceStatusEvent(
+      String workspaceId, WorkspaceStatus status, WorkspaceStatus previous, String errorMsg) {
+    eventService.publish(
+        DtoFactory.newDto(WorkspaceStatusEvent.class)
+            .withWorkspaceId(workspaceId)
+            .withPrevStatus(previous)
+            .withError(errorMsg)
+            .withStatus(status));
+  }
+
+  private static EnvironmentImpl copyEnv(Workspace workspace, String envName) {
+
+    requireNonNull(workspace, "Workspace should not be null.");
+    requireNonNull(envName, "Environment name should not be null.");
+    final Environment environment = workspace.getConfig().getEnvironments().get(envName);
+    if (environment == null) {
+      throw new IllegalArgumentException(
+          format("Workspace '%s' doesn't contain environment '%s'", workspace.getId(), envName));
+    }
+    return new EnvironmentImpl(environment);
+  }
+
+  /**
+   * Once called no more workspaces are allowed to start, {@link #startAsync} will always throw an
+   * appropriate exception. All the running workspaces will continue running, unless stopped
+   * directly.
+   *
+   * @return true if this is the caller is the one who refused start, otherwise if start is being
+   *     already refused returns false
+   */
+  public boolean refuseStart() {
+    return isStartRefused.compareAndSet(false, true);
+  }
+
+  /**
+   * Gets the workspaces identifiers managed by this component. If an identifier is present in set
+   * then that workspace wasn't stopped at the moment of method execution.
+   *
+   * @return workspaces identifiers for those workspaces that are running(not stopped), or an empty
+   *     set if there is no a single running workspace
+   */
+  public Set<String> getRunning() {
+    return ImmutableSet.copyOf(statuses.asMap().keySet());
+  }
+
+  /**
+   * Returns true if there is at least one workspace running(it's status is different from {@link
+   * WorkspaceStatus#STOPPED}), otherwise returns false.
+   */
+  public boolean isAnyRunning() {
+    return !statuses.asMap().isEmpty();
+  }
+
+  /**
+   * Gets the list of workspace id's which are currently starting or stopping on given node. (it's
+   * status is {@link WorkspaceStatus#STARTING} or {@link WorkspaceStatus#STOPPING})
+   */
+  public Set<String> getInProgress() {
+    return statuses
+        .asMap()
+        .entrySet()
+        .stream()
+        .filter(e -> STARTING == e.getValue() || STOPPING == e.getValue())
+        .map(Entry::getKey)
+        .filter(this::containsThisRuntimesId)
+        .collect(toSet());
+  }
+
+  /**
+   * Returns true if there is at least one local workspace starting or stopping (it's status is
+   * {@link WorkspaceStatus#STARTING} or {@link WorkspaceStatus#STOPPING}), otherwise returns false.
+   */
+  public boolean isAnyInProgress() {
+    return statuses
+        .asMap()
+        .entrySet()
+        .stream()
+        .filter(e -> STARTING == e.getValue() || STOPPING == e.getValue())
+        .map(Entry::getKey)
+        .anyMatch(this::containsThisRuntimesId);
+  }
+
+  private void setRuntimesId(String workspaceId) {
+    try {
+      final WorkspaceImpl workspace = workspaceDao.get(workspaceId);
+      workspace.getAttributes().put(WORKSPACE_RUNTIMES_ID_ATTRIBUTE, workspaceRuntimesId);
+      workspaceDao.update(workspace);
+    } catch (NotFoundException | ServerException | ConflictException ex) {
+      LOG.warn(
+          String.format(
+              "Cannot set runtimes id attribute for the workspace %s. Cause: %s",
+              workspaceId, ex.getMessage()));
+    }
+  }
+
+  /** Checks whether workspace with given id, related to this workspace runtimes. */
+  private boolean containsThisRuntimesId(String workspaceId) {
+    try {
+      final WorkspaceImpl workspace = workspaceDao.get(workspaceId);
+      if (workspaceRuntimesId.equals(
+          workspace.getAttributes().get(WORKSPACE_RUNTIMES_ID_ATTRIBUTE))) {
+        return true;
+      }
+    } catch (NotFoundException | ServerException ex) {
+      LOG.warn(
+          String.format(
+              "Failed to get processing workspace %s. Cause: %s", workspaceId, ex.getMessage()));
+    }
+    return false;
+  }
+
+  /**
+   * Returns an optional wrapping the runtime context of the workspace with the given identifier, an
+   * empty optional is returned in case the workspace doesn't have the runtime.
+   */
+  public Optional<RuntimeContext> getRuntimeContext(String workspaceId) {
+    try (Unlocker ignored = lockService.readLock(workspaceId)) {
+      InternalRuntime<?> runtime = runtimes.get(workspaceId);
+      if (runtime == null) {
+        return Optional.empty();
+      }
+      return Optional.of(runtime.getContext());
+    }
+  }
+
+  public Set<String> getSupportedRecipes() {
+    return environmentFactories.keySet();
+  }
+
+  private InternalEnvironment createInternalEnvironment(
+      Environment environment, Map<String, String> workspaceConfigAttributes)
+      throws InfrastructureException, ValidationException, NotFoundException {
+    String recipeType = environment.getRecipe().getType();
+    InternalEnvironmentFactory factory = environmentFactories.get(recipeType);
+    if (factory == null) {
+      throw new NotFoundException(
+          format("InternalEnvironmentFactory is not configured for recipe type: '%s'", recipeType));
+    }
+    InternalEnvironment internalEnvironment = factory.create(environment);
+
+    applyWorkspaceNext(internalEnvironment, workspaceConfigAttributes, recipeType);
+
+    return internalEnvironment;
+  }
+
+  private void applyWorkspaceNext(
+      InternalEnvironment internalEnvironment,
+      Map<String, String> workspaceAttributes,
+      String recipeType)
+      throws InfrastructureException {
+    Collection<ChePlugin> chePlugins = workspaceNextObjectsRetriever.get(workspaceAttributes);
+    if (chePlugins.isEmpty()) {
+      return;
+    }
+    WorkspaceNextApplier wsNext = workspaceNextAppliers.get(recipeType);
+    if (wsNext == null) {
+      throw new InfrastructureException(
+          "Workspace.Next features are not supported for recipe type " + recipeType);
+    }
+    wsNext.apply(internalEnvironment, chePlugins);
+  }
+
+  private String sessionUserNameOr(String nameIfNoUser) {
+    final Subject subject = EnvironmentContext.getCurrent().getSubject();
+    if (!subject.isAnonymous()) {
+      return subject.getUserName();
+    }
+    return nameIfNoUser;
+  }
+
+  private class AbnormalRuntimeStopListener implements EventSubscriber<RuntimeStatusEvent> {
+
+    @Override
+    public void onEvent(RuntimeStatusEvent event) {
+      if (event.isFailed()) {
+        String workspaceId = event.getIdentity().getWorkspaceId();
+        // Cancels workspace servers probes if any
+        probeScheduler.cancel(workspaceId);
+        final WorkspaceStatus status;
+        try (Unlocker ignored = lockService.writeLock(workspaceId)) {
+          runtimes.remove(workspaceId);
+          status = statuses.remove(workspaceId);
         }
+        if (status != null) {
+          publishWorkspaceStatusEvent(
+              workspaceId,
+              STOPPED,
+              RUNNING,
+              "Error occurs on workspace runtime stop. Error: " + event.getError());
+          setAbnormalStopAttributes(workspaceId, event.getError());
+        }
+      }
     }
 
-    @VisibleForTesting
-    void publishEvent(EventType type, String workspaceId, String error) {
-        eventService.publish(newDto(WorkspaceStatusEvent.class)
-                                     .withEventType(type)
-                                     .withWorkspaceId(workspaceId)
-                                     .withError(error));
+    private void setAbnormalStopAttributes(String workspaceId, String error) {
+      try {
+        WorkspaceImpl workspace = workspaceDao.get(workspaceId);
+        workspace.getAttributes().put(ERROR_MESSAGE_ATTRIBUTE_NAME, error);
+        workspace.getAttributes().put(STOPPED_ATTRIBUTE_NAME, Long.toString(currentTimeMillis()));
+        workspace.getAttributes().put(STOPPED_ABNORMALLY_ATTRIBUTE_NAME, Boolean.toString(true));
+        workspaceDao.update(workspace);
+      } catch (NotFoundException | ServerException | ConflictException e) {
+        LOG.warn(
+            format(
+                "Cannot set error status of the workspace %s. Error is: %s", workspaceId, error));
+      }
     }
-
-    @VisibleForTesting
-    void cleanupStartResources(String workspaceId) {
-        rwLock.writeLock().lock();
-        try {
-            descriptors.remove(workspaceId);
-            startQueues.remove(workspaceId);
-        } finally {
-            rwLock.writeLock().unlock();
-        }
-    }
-
-    @VisibleForTesting
-    void removeRuntime(String wsId) {
-        rwLock.writeLock().lock();
-        try {
-            descriptors.remove(wsId);
-        } finally {
-            rwLock.writeLock().unlock();
-        }
-    }
-
-    /**
-     * Stops workspace by destroying all its machines and removing it from in memory storage.
-     */
-    private void destroyRuntime(String wsId, WorkspaceRuntimeImpl workspace) throws NotFoundException, ServerException {
-        publishEvent(EventType.STOPPING, wsId, null);
-        final List<MachineImpl> machines = new ArrayList<>(workspace.getMachines());
-        final MachineImpl devMachine = rmFirst(machines, m -> m.getConfig().isDev());
-        // destroying all non-dev machines
-        for (MachineImpl machine : machines) {
-            try {
-                machineManager.destroy(machine.getId(), false);
-            } catch (NotFoundException ignore) {
-                // it is ok, machine has been already destroyed
-            } catch (RuntimeException | MachineException ex) {
-                LOG.error(format("Could not destroy machine '%s' of workspace '%s'",
-                                 machine.getId(),
-                                 machine.getWorkspaceId()),
-                          ex);
-            }
-        }
-        // destroying dev-machine
-        try {
-            machineManager.destroy(devMachine.getId(), false);
-            publishEvent(EventType.STOPPED, wsId, null);
-        } catch (NotFoundException ignore) {
-            // it is ok, machine has been already destroyed
-        } catch (RuntimeException | ServerException ex) {
-            publishEvent(EventType.ERROR, wsId, ex.getLocalizedMessage());
-            throw ex;
-        } finally {
-            removeRuntime(wsId);
-        }
-    }
-
-    private void startQueue(String wsId, String envName, boolean recover) throws ServerException,
-                                                                                 NotFoundException,
-                                                                                 ConflictException {
-        publishEvent(EventType.STARTING, wsId, null);
-        MachineConfigImpl config = getPeekConfig(wsId);
-        while (config != null) {
-            startMachine(config, wsId, envName, recover);
-            config = getPeekConfig(wsId);
-        }
-
-        // Clean up the start queue when all the machines successfully started
-        rwLock.writeLock().lock();
-        try {
-            final Queue<MachineConfigImpl> queue = startQueues.get(wsId);
-            if (queue != null && queue.isEmpty()) {
-                startQueues.remove(wsId);
-            }
-        } finally {
-            rwLock.writeLock().unlock();
-        }
-    }
-
-    private MachineConfigImpl getPeekConfig(String wsId) throws ConflictException, ServerException {
-        // Trying to get machine to start. If queue doesn't exist then workspace
-        // start was interrupted either by the stop method, or by the cleanup
-        rwLock.readLock().lock();
-        try {
-            ensurePreDestroyIsNotExecuted();
-            final Queue<MachineConfigImpl> queue = startQueues.get(wsId);
-            if (queue == null) {
-                throw new ConflictException(format("Workspace '%s' start interrupted. " +
-                                                   "Workspace was stopped before all its machines were started",
-                                                   wsId));
-            }
-            return queue.peek();
-        } finally {
-            rwLock.readLock().unlock();
-        }
-    }
-
-    private void startMachine(MachineConfigImpl config,
-                              String wsId,
-                              String envName,
-                              boolean recover) throws ServerException,
-                                                      NotFoundException,
-                                                      ConflictException {
-        // Trying to start machine from the given configuration
-        MachineImpl machine = null;
-        try {
-            machine = createMachine(config, wsId, envName, recover);
-        } catch (RuntimeException | MachineException | NotFoundException | SnapshotException | ConflictException ex) {
-            if (config.isDev()) {
-                publishEvent(EventType.ERROR, wsId, ex.getLocalizedMessage());
-                cleanupStartResources(wsId);
-                throw ex;
-            }
-            LOG.error(format("Error while creating non-dev machine '%s' in workspace '%s', environment '%s'",
-                             config.getName(),
-                             wsId,
-                             envName),
-                      ex);
-        }
-
-        // Machine destroying is an expensive operation which must be
-        // performed outside of the lock, this section checks if
-        // the workspace wasn't stopped while it is starting and sets
-        // polled flag to true if the workspace wasn't stopped plus
-        // polls the proceeded machine configuration from the queue
-        boolean queuePolled = false;
-        rwLock.readLock().lock();
-        try {
-            ensurePreDestroyIsNotExecuted();
-            final Queue<MachineConfigImpl> queue = startQueues.get(wsId);
-            if (queue != null) {
-                queue.poll();
-                queuePolled = true;
-                if (machine != null) {
-                    final WorkspaceRuntimeImpl runtime = descriptors.get(wsId).getRuntime();
-                    if (config.isDev()) {
-                        runtime.setDevMachine(machine);
-                        publishEvent(EventType.RUNNING, wsId, null);
-                    }
-                    runtime.getMachines().add(machine);
-                }
-            }
-        } finally {
-            rwLock.readLock().unlock();
-        }
-
-        // If machine config is not polled from the queue
-        // then stop method was executed and the machine which
-        // has been just created must be destroyed
-        if (!queuePolled) {
-            if (machine != null) {
-                machineManager.destroy(machine.getId(), false);
-            }
-            throw new ConflictException(format("Workspace '%s' start interrupted. " +
-                                               "Workspace was stopped before all its machines were started",
-                                               wsId));
-        }
-    }
-
-    private <T> T rmFirst(List<? extends T> elements, Predicate<T> predicate) {
-        T element = null;
-        for (final Iterator<? extends T> it = elements.iterator(); it.hasNext() && element == null; ) {
-            final T next = it.next();
-            if (predicate.apply(next)) {
-                element = next;
-                it.remove();
-            }
-        }
-        return element;
-    }
-
-    /**
-     * Creates or recovers machine based on machine config.
-     */
-    private MachineImpl createMachine(MachineConfig machine,
-                                      String workspaceId,
-                                      String envName,
-                                      boolean recover) throws MachineException,
-                                                              SnapshotException,
-                                                              NotFoundException,
-                                                              ConflictException {
-        try {
-            if (recover) {
-                return machineManager.recoverMachine(machine, workspaceId, envName);
-            } else {
-                return machineManager.createMachineSync(machine, workspaceId, envName);
-            }
-        } catch (BadRequestException brEx) {
-            // TODO fix this in machineManager
-            throw new IllegalArgumentException(brEx.getLocalizedMessage(), brEx);
-        }
-    }
-
-    private void ensurePreDestroyIsNotExecuted() throws ServerException {
-        if (isPreDestroyInvoked) {
-            throw new ServerException("Could not perform operation because application server is stopping");
-        }
-    }
-
-    /**
-     * Wrapper for the {@link WorkspaceRuntime} instance.
-     * Knows the state of the started workspace runtime,
-     * helps to postpone {@code WorkspaceRuntime} instance creation to
-     * the time when all the machines from the workspace are created.
-     */
-    public static class RuntimeDescriptor {
-
-        private WorkspaceRuntimeImpl runtime;
-        private boolean              isStopping;
-
-        private RuntimeDescriptor(WorkspaceRuntimeImpl runtime) {
-            this.runtime = runtime;
-        }
-
-        private RuntimeDescriptor(RuntimeDescriptor descriptor) {
-            this(new WorkspaceRuntimeImpl(descriptor.runtime));
-            this.isStopping = descriptor.isStopping;
-        }
-
-        /**
-         * Returns an {@link Optional} describing a started {@link WorkspaceRuntime},
-         * if the runtime is in starting state then an empty {@code Optional} will be returned.
-         */
-        public WorkspaceRuntimeImpl getRuntime() {
-            return runtime;
-        }
-
-        /**
-         * Returns the status of the started workspace runtime.
-         * The relation between {@link #getRuntime()} and this method
-         * is pretty clear, whether workspace is in starting state, then
-         * {@code getRuntime()} will return an empty optional, otherwise
-         * the optional describing a running or stopping workspace runtime.
-         */
-        public WorkspaceStatus getRuntimeStatus() {
-            if (isStopping) {
-                return WorkspaceStatus.STOPPING;
-            }
-            if (runtime.getDevMachine() == null) {
-                return WorkspaceStatus.STARTING;
-            }
-            return WorkspaceStatus.RUNNING;
-        }
-
-        private void setStopping() {
-            isStopping = true;
-        }
-    }
+  }
 }

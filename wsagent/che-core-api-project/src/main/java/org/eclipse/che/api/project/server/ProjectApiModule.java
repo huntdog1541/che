@@ -1,76 +1,98 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.project.server;
 
-import com.google.inject.AbstractModule;
-import com.google.inject.multibindings.Multibinder;
-import com.google.inject.name.Names;
+import static com.google.inject.multibindings.Multibinder.newSetBinder;
 
-import org.eclipse.che.api.project.server.handlers.CreateBaseProjectTypeHandler;
+import com.google.inject.AbstractModule;
+import com.google.inject.assistedinject.FactoryModuleBuilder;
+import com.google.inject.multibindings.Multibinder;
+import org.eclipse.che.api.core.model.workspace.config.ProjectConfig;
 import org.eclipse.che.api.project.server.handlers.ProjectHandler;
-import org.eclipse.che.api.project.server.importer.ProjectImporter;
-import org.eclipse.che.api.project.server.importer.ProjectImportersService;
+import org.eclipse.che.api.project.server.impl.CreateBaseProjectTypeHandler;
+import org.eclipse.che.api.project.server.impl.InmemoryProjectRegistry;
+import org.eclipse.che.api.project.server.impl.OnWorkspaceStartProjectInitializer;
+import org.eclipse.che.api.project.server.impl.ProjectConfigRegistry;
+import org.eclipse.che.api.project.server.impl.ProjectHandlerRegistry;
+import org.eclipse.che.api.project.server.impl.ProjectImporterRegistry;
+import org.eclipse.che.api.project.server.impl.ProjectServiceApi;
+import org.eclipse.che.api.project.server.impl.ProjectServiceApiFactory;
+import org.eclipse.che.api.project.server.impl.RegisteredProjectFactory;
+import org.eclipse.che.api.project.server.impl.RegisteredProjectImpl;
+import org.eclipse.che.api.project.server.impl.RootDirCreationHandler;
+import org.eclipse.che.api.project.server.impl.RootDirRemovalHandler;
+import org.eclipse.che.api.project.server.impl.ValidatingProjectManager;
+import org.eclipse.che.api.project.server.impl.ZipProjectImporter;
 import org.eclipse.che.api.project.server.type.BaseProjectType;
 import org.eclipse.che.api.project.server.type.InitBaseProjectTypeHandler;
+import org.eclipse.che.api.project.server.type.ProjectQualifier;
 import org.eclipse.che.api.project.server.type.ProjectTypeDef;
-import org.eclipse.che.api.vfs.VirtualFileFilter;
-import org.eclipse.che.api.vfs.VirtualFileSystemProvider;
-import org.eclipse.che.api.vfs.impl.file.DefaultFileWatcherNotificationHandler;
-import org.eclipse.che.api.vfs.impl.file.FileWatcherNotificationHandler;
-import org.eclipse.che.api.vfs.impl.file.LocalVirtualFileSystemProvider;
-import org.eclipse.che.api.vfs.search.MediaTypeFilter;
-import org.eclipse.che.api.vfs.search.SearcherProvider;
-import org.eclipse.che.api.vfs.search.impl.FSLuceneSearcherProvider;
-
-import java.nio.file.PathMatcher;
+import org.eclipse.che.api.project.server.type.ProjectTypeResolver;
+import org.eclipse.che.api.project.server.type.ProjectTypes;
+import org.eclipse.che.api.project.server.type.ProjectTypesFactory;
+import org.eclipse.che.api.project.server.type.SimpleProjectQualifier;
+import org.eclipse.che.api.project.server.type.SimpleProjectTypeResolver;
 
 /**
  * Guice module contains configuration of Project API components.
  *
  * @author gazarenkov
  * @author Artem Zatsarynnyi
+ * @author Dmitry Kuleshov
  */
 public class ProjectApiModule extends AbstractModule {
 
-    @Override
-    protected void configure() {
-        Multibinder<ProjectImporter> projectImportersMultibinder = Multibinder.newSetBinder(binder(), ProjectImporter.class);
-        projectImportersMultibinder.addBinding().to(ZipProjectImporter.class);
+  @Override
+  protected void configure() {
+    bind(ProjectService.class);
+    bind(ProjectImportersService.class);
+    bind(ProjectTypeService.class);
 
-        Multibinder.newSetBinder(binder(), ProjectTypeDef.class).addBinding().to(BaseProjectType.class);
+    bind(OnWorkspaceStartProjectInitializer.class);
+    bind(ProjectImporterRegistry.class);
+    bind(ProjectHandlerRegistry.class);
 
-        Multibinder<ProjectHandler> projectHandlersMultibinder = Multibinder.newSetBinder(binder(), ProjectHandler.class);
-        projectHandlersMultibinder.addBinding().to(CreateBaseProjectTypeHandler.class);
-        projectHandlersMultibinder.addBinding().to(InitBaseProjectTypeHandler.class);
+    bind(RootDirCreationHandler.class).asEagerSingleton();
+    bind(RootDirRemovalHandler.class).asEagerSingleton();
 
-        bind(ProjectRegistry.class).asEagerSingleton();
-        bind(ProjectService.class);
-        bind(ProjectTypeService.class);
-        bind(ProjectImportersService.class);
+    bind(ProjectManager.class).to(ValidatingProjectManager.class);
+    bind(ProjectQualifier.class).to(SimpleProjectQualifier.class);
+    bind(ProjectTypeResolver.class).to(SimpleProjectTypeResolver.class);
 
-        bind(WorkspaceProjectsSyncer.class).to(WorkspaceHolder.class);
+    bind(ProjectConfigRegistry.class).to(InmemoryProjectRegistry.class);
 
-        // configure VFS
-        Multibinder<VirtualFileFilter> filtersMultibinder = Multibinder.newSetBinder(binder(),
-                                                                                     VirtualFileFilter.class,
-                                                                                     Names.named("vfs.index_filter"));
-        filtersMultibinder.addBinding().to(MediaTypeFilter.class);
+    bind(ProjectJsonRpcServiceConfigurator.class).asEagerSingleton();
 
-        Multibinder<PathMatcher> pathMatcherMultibinder = Multibinder.newSetBinder(binder(),
-                                                                                   PathMatcher.class,
-                                                                                   Names.named("vfs.index_filter_matcher"));
+    newSetBinder(binder(), ProjectImporter.class).addBinding().to(ZipProjectImporter.class);
 
-        bind(SearcherProvider.class).to(FSLuceneSearcherProvider.class);
-        bind(VirtualFileSystemProvider.class).to(LocalVirtualFileSystemProvider.class);
+    newSetBinder(binder(), ProjectTypeDef.class).addBinding().to(BaseProjectType.class);
 
-        bind(FileWatcherNotificationHandler.class).to(DefaultFileWatcherNotificationHandler.class);
-    }
+    Multibinder<ProjectHandler> projectHandlers = newSetBinder(binder(), ProjectHandler.class);
+    projectHandlers.addBinding().to(CreateBaseProjectTypeHandler.class);
+    projectHandlers.addBinding().to(InitBaseProjectTypeHandler.class);
+
+    install(
+        new FactoryModuleBuilder()
+            .implement(ProjectConfig.class, RegisteredProjectImpl.class)
+            .build(RegisteredProjectFactory.class));
+
+    install(
+        new FactoryModuleBuilder()
+            .implement(ProjectTypes.class, ProjectTypes.class)
+            .build(ProjectTypesFactory.class));
+
+    install(
+        new FactoryModuleBuilder()
+            .implement(ProjectServiceApi.class, ProjectServiceApi.class)
+            .build(ProjectServiceApiFactory.class));
+  }
 }

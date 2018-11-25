@@ -1,36 +1,29 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.factory.server.impl;
 
+import javax.inject.Singleton;
 import org.eclipse.che.api.core.BadRequestException;
 import org.eclipse.che.api.factory.server.FactoryAcceptValidator;
-import org.eclipse.che.api.factory.shared.dto.Factory;
-import org.eclipse.che.api.user.server.dao.PreferenceDao;
+import org.eclipse.che.api.factory.shared.dto.FactoryDto;
 
-import javax.inject.Inject;
-import javax.inject.Singleton;
-
-/**
- * Factory accept stage validator.
- */
+/** Factory accept stage validator. */
 @Singleton
-public class FactoryAcceptValidatorImpl extends FactoryBaseValidator implements FactoryAcceptValidator {
-    @Inject
-    public FactoryAcceptValidatorImpl(PreferenceDao preferenceDao) {
-        super(preferenceDao);
-    }
+public class FactoryAcceptValidatorImpl extends FactoryBaseValidator
+    implements FactoryAcceptValidator {
 
-    @Override
-    public void validateOnAccept(Factory factory) throws BadRequestException {
-        validateCurrentTimeBetweenSinceUntil(factory);
-        validateProjectActions(factory);
-    }
+  @Override
+  public void validateOnAccept(FactoryDto factory) throws BadRequestException {
+    validateCurrentTimeBetweenSinceUntil(factory);
+    validateProjectActions(factory);
+  }
 }

@@ -1,13 +1,14 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.plugin.jdb.ide.configuration;
 
 import com.google.gwt.core.client.GWT;
@@ -22,13 +23,11 @@ import com.google.gwt.user.client.ui.CheckBox;
 import com.google.gwt.user.client.ui.FlowPanel;
 import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
-
-import org.eclipse.che.ide.ui.listbox.CustomComboBox;
-import org.eclipse.che.ide.util.Pair;
-
-import javax.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.List;
+import javax.validation.constraints.NotNull;
+import org.eclipse.che.ide.ui.listbox.CustomComboBox;
+import org.eclipse.che.ide.util.Pair;
 
 /**
  * The implementation of {@link JavaDebugConfigurationPageView}.
@@ -37,115 +36,122 @@ import java.util.List;
  */
 public class JavaDebugConfigurationPageViewImpl implements JavaDebugConfigurationPageView {
 
-    private static final JavaDebugConfigurationPageViewImplUiBinder UI_BINDER =
-            GWT.create(JavaDebugConfigurationPageViewImplUiBinder.class);
+  private static final JavaDebugConfigurationPageViewImplUiBinder UI_BINDER =
+      GWT.create(JavaDebugConfigurationPageViewImplUiBinder.class);
 
-    private final FlowPanel rootElement;
+  private final FlowPanel rootElement;
 
-    @UiField
-    CheckBox       devHost;
-    @UiField
-    TextBox        host;
-    @UiField
-    CustomComboBox port;
+  @UiField CheckBox devHost;
+  @UiField TextBox host;
+  @UiField CustomComboBox port;
 
-    private ActionDelegate             delegate;
-    private List<Pair<String, String>> ports;
+  private ActionDelegate delegate;
+  private List<Pair<String, String>> ports;
 
-    public JavaDebugConfigurationPageViewImpl() {
-        rootElement = UI_BINDER.createAndBindUi(this);
-        ports = new ArrayList<>();
+  public JavaDebugConfigurationPageViewImpl() {
+    rootElement = UI_BINDER.createAndBindUi(this);
+    ports = new ArrayList<>();
 
-        devHost.addValueChangeHandler(new ValueChangeHandler<Boolean>() {
-            @Override
-            public void onValueChange(ValueChangeEvent<Boolean> event) {
-                delegate.onDevHostChanged(event.getValue());
-            }
+    devHost.addValueChangeHandler(
+        new ValueChangeHandler<Boolean>() {
+          @Override
+          public void onValueChange(ValueChangeEvent<Boolean> event) {
+            delegate.onDevHostChanged(event.getValue());
+          }
         });
 
-        updateDialog();
+    updateDialog();
+  }
+
+  @Override
+  public void setDelegate(ActionDelegate delegate) {
+    this.delegate = delegate;
+  }
+
+  @Override
+  public Widget asWidget() {
+    return rootElement;
+  }
+
+  @Override
+  public String getHost() {
+    return host.getValue();
+  }
+
+  @Override
+  public void setHost(String host) {
+    this.host.setValue(host);
+  }
+
+  @Override
+  public int getPort() {
+    String port = this.port.getValue().trim();
+    if (port.isEmpty()) {
+      return 0;
     }
 
-    @Override
-    public void setDelegate(ActionDelegate delegate) {
-        this.delegate = delegate;
+    try {
+      return Integer.valueOf(port);
+    } catch (NumberFormatException e) {
+      return 0;
     }
+  }
 
-    @Override
-    public Widget asWidget() {
-        return rootElement;
-    }
+  @Override
+  public void setPort(int port) {
+    this.port.setValue(port <= 0 ? "" : String.valueOf(port));
+  }
 
-    @Override
-    public String getHost() {
-        return host.getValue();
-    }
+  @Override
+  public void setHostEnableState(boolean enable) {
+    host.setEnabled(enable);
+  }
 
-    @Override
-    public void setHost(String host) {
-        this.host.setValue(host);
-    }
+  @Override
+  public void setPortsList(@NotNull List<Pair<String, String>> ports) {
+    this.ports = ports;
+    updatePortsList();
+  }
 
-    @Override
-    public int getPort() {
-        return Integer.valueOf(port.getValue());
-    }
+  @Override
+  public void setDevHost(boolean value) {
+    devHost.setValue(value, true);
+  }
 
-    @Override
-    public void setPort(int port) {
-        this.port.setValue(String.valueOf(port));
+  private void updatePortsList() {
+    port.clear();
+    for (Pair<String, String> entry : ports) {
+      port.addItem(entry.first, entry.second);
     }
+  }
 
-    @Override
-    public void setHostEnableState(boolean enable) {
-        host.setEnabled(enable);
+  private void updateDialog() {
+    boolean connectToDevMachine = devHost.getValue();
+    if (connectToDevMachine) {
+      updatePortsList();
+      port.setFocus(true);
+    } else {
+      host.selectAll();
+      host.setFocus(true);
+      port.clear();
     }
+  }
 
-    @Override
-    public void setPortsList(@NotNull List<Pair<String, String>> ports) {
-        this.ports = ports;
-        updatePortsList();
-    }
+  @UiHandler({"host"})
+  void onHostKeyUp(KeyUpEvent event) {
+    delegate.onHostChanged();
+  }
 
-    @Override
-    public void setDevHost(boolean value) {
-        devHost.setValue(value, true);
-    }
+  @UiHandler({"port"})
+  void onPortKeyUp(KeyUpEvent event) {
+    delegate.onPortChanged();
+  }
 
-    private void updatePortsList() {
-        port.clear();
-        for (Pair<String, String> entry : ports) {
-            port.addItem(entry.first, entry.second);
-        }
-    }
+  @UiHandler({"port"})
+  void onPortChanged(ChangeEvent event) {
+    delegate.onPortChanged();
+  }
 
-    private void updateDialog() {
-        boolean connectToDevMachine = devHost.getValue();
-        if (connectToDevMachine) {
-            updatePortsList();
-            port.setFocus(true);
-        } else {
-            host.selectAll();
-            host.setFocus(true);
-            port.clear();
-        }
-    }
-
-    @UiHandler({"host"})
-    void onHostKeyUp(KeyUpEvent event) {
-        delegate.onHostChanged();
-    }
-
-    @UiHandler({"port"})
-    void onPortKeyUp(KeyUpEvent event) {
-        delegate.onPortChanged();
-    }
-
-    @UiHandler({"port"})
-    void onPortChanged(ChangeEvent event) {
-        delegate.onPortChanged();
-    }
-
-    interface JavaDebugConfigurationPageViewImplUiBinder extends UiBinder<FlowPanel, JavaDebugConfigurationPageViewImpl> {
-    }
+  interface JavaDebugConfigurationPageViewImplUiBinder
+      extends UiBinder<FlowPanel, JavaDebugConfigurationPageViewImpl> {}
 }

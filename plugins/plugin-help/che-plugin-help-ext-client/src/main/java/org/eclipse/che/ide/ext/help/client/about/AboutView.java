@@ -1,13 +1,14 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.help.client.about;
 
 import org.eclipse.che.ide.api.mvp.View;
@@ -19,38 +20,25 @@ import org.eclipse.che.ide.api.mvp.View;
  */
 public interface AboutView extends View<AboutView.ActionDelegate> {
 
-    interface ActionDelegate {
+  interface ActionDelegate {
 
-        /**
-         * Performs any actions appropriate in response to the user having pressed the OK button
-         */
-        void onOkClicked();
-    }
+    /** Performs any actions appropriate in response to the user having pressed the OK button */
+    void onOkClicked();
 
-    /** Close view. */
-    void close();
+    /** Shows build details information window. */
+    void onShowBuildDetailsClicked();
+  }
 
-    /** Show About dialog. */
-    void showDialog();
+  /** Close view. */
+  void close();
 
-    /**
-     * Set application's version value.
-     *
-     * @param version
-     */
-    void setVersion(String version);
+  /** Show About dialog. */
+  void showDialog();
 
-    /**
-     * Set application's revision value.
-     *
-     * @param revision
-     */
-    void setRevision(String revision);
-
-    /**
-     * Set application's build time value.
-     *
-     * @param time
-     */
-    void setTime(String time);
+  /**
+   * Set application's version value.
+   *
+   * @param version
+   */
+  void setVersion(String version);
 }

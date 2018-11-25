@@ -1,326 +1,154 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.git.client.fetch;
 
-import com.googlecode.gwt.test.utils.GwtReflectionUtils;
-
-import org.eclipse.che.api.git.shared.Branch;
-import org.eclipse.che.api.git.shared.Remote;
-import org.eclipse.che.ide.ext.git.client.BaseTest;
-import org.eclipse.che.ide.ext.git.client.BranchSearcher;
-import org.eclipse.che.ide.rest.AsyncRequestCallback;
-import org.eclipse.che.ide.websocket.rest.RequestCallback;
-import org.junit.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.doAnswer;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyObject;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.eclipse.che.ide.ext.git.client.fetch.FetchPresenter.FETCH_COMMAND_NAME;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.eclipse.che.api.git.shared.Branch;
+import org.eclipse.che.api.git.shared.Remote;
+import org.eclipse.che.api.promises.client.Operation;
+import org.eclipse.che.ide.api.auth.OAuthServiceClient;
+import org.eclipse.che.ide.ext.git.client.BaseTest;
+import org.eclipse.che.ide.ext.git.client.BranchSearcher;
+import org.eclipse.che.ide.resource.Path;
+import org.junit.Test;
+import org.mockito.Mock;
 
 /**
  * Testing {@link FetchPresenter} functionality.
  *
  * @author Andrey Plotnikov
+ * @author Vlad Zhukovskyi
  */
 public class FetchPresenterTest extends BaseTest {
-    public static final boolean NO_REMOVE_DELETE_REFS = false;
-    public static final boolean FETCH_ALL_BRANCHES    = true;
-    public static final boolean SHOW_ALL_INFORMATION  = true;
-    @Mock
-    private FetchView      view;
-    @Mock
-    private Branch         branch;
-    @Mock
-    private BranchSearcher branchSearcher;
-    @InjectMocks
-    private FetchPresenter presenter;
+  public static final boolean NO_REMOVE_DELETE_REFS = false;
+  public static final boolean FETCH_ALL_BRANCHES = true;
+  @Mock private FetchView view;
+  @Mock private Branch branch;
+  @Mock private BranchSearcher branchSearcher;
+  @Mock private OAuthServiceClient oAuthServiceClient;
 
-    @Override
-    public void disarm() {
-        super.disarm();
-        presenter = new FetchPresenter(dtoFactory,
-                                       view,
-                                       service,
-                                       appContext,
-                                       constant,
-                                       notificationManager,
-                                       dtoUnmarshallerFactory,
-                                       branchSearcher,
-                                       gitOutputConsoleFactory,
-                                       consolesPanelPresenter);
-        when(view.getRepositoryName()).thenReturn(REPOSITORY_NAME);
-        when(view.getRepositoryUrl()).thenReturn(REMOTE_URI);
-        when(view.getLocalBranch()).thenReturn(LOCAL_BRANCH);
-        when(view.getRemoteBranch()).thenReturn(REMOTE_BRANCH);
-        when(branch.getName()).thenReturn(REMOTE_BRANCH);
-    }
+  private FetchPresenter presenter;
 
-    @Test
-    public void testShowDialogWhenBranchListRequestIsSuccessful() throws Exception {
-        final List<Remote> remotes = new ArrayList<>();
-        remotes.add(mock(Remote.class));
-        final List<Branch> branches = new ArrayList<>();
-        branches.add(branch);
+  @Override
+  public void disarm() {
+    super.disarm();
 
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                AsyncRequestCallback<List<Remote>> callback = (AsyncRequestCallback<List<Remote>>)arguments[3];
-                @SuppressWarnings("NonJREEmulationClassesInClientCode")
-                Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-                onSuccess.invoke(callback, remotes);
-                return callback;
-            }
-        }).when(service)
-          .remoteList(devMachine, anyObject(), anyString(), anyBoolean(), (AsyncRequestCallback<List<Remote>>)anyObject());
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                AsyncRequestCallback<List<Branch>> callback = (AsyncRequestCallback<List<Branch>>)arguments[2];
-                @SuppressWarnings("NonJREEmulationClassesInClientCode")
-                Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-                onSuccess.invoke(callback, branches);
-                return callback;
-            }
-        }).doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                AsyncRequestCallback<List<Branch>> callback = (AsyncRequestCallback<List<Branch>>)arguments[2];
-                @SuppressWarnings("NonJREEmulationClassesInClientCode")
-                Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-                onSuccess.invoke(callback, branches);
-                return callback;
-            }
-        }).when(service).branchList(eq(devMachine), anyObject(), anyString(), (AsyncRequestCallback<List<Branch>>)anyObject());
+    presenter =
+        new FetchPresenter(
+            dtoFactory,
+            view,
+            service,
+            constant,
+            notificationManager,
+            branchSearcher,
+            gitOutputConsoleFactory,
+            processesPanelPresenter,
+            oAuthServiceClient);
 
-        presenter.showDialog();
+    when(service.remoteList(any(Path.class), anyString(), anyBoolean()))
+        .thenReturn(remoteListPromise);
+    when(remoteListPromise.then(any(Operation.class))).thenReturn(remoteListPromise);
+    when(remoteListPromise.catchError(any(Operation.class))).thenReturn(remoteListPromise);
 
-        verify(appContext).getCurrentProject();
-        verify(service).remoteList(eq(devMachine), eq(rootProjectConfig), anyString(), eq(SHOW_ALL_INFORMATION),
-                                   (AsyncRequestCallback<List<Remote>>)anyObject());
-        verify(view).setEnableFetchButton(eq(ENABLE_BUTTON));
-        verify(view).setRepositories((List<Remote>)anyObject());
-        verify(view).setRemoveDeleteRefs(eq(NO_REMOVE_DELETE_REFS));
-        verify(view).setFetchAllBranches(eq(FETCH_ALL_BRANCHES));
-        verify(view).showDialog();
-        verify(view).setRemoteBranches((List<String>)anyObject());
-        verify(view).setLocalBranches((List<String>)anyObject());
-    }
+    when(service.branchList(any(Path.class), anyObject())).thenReturn(branchListPromise);
+    when(branchListPromise.then(any(Operation.class))).thenReturn(branchListPromise);
+    when(branchListPromise.catchError(any(Operation.class))).thenReturn(branchListPromise);
 
-    @Test
-    public void testShowDialogWhenBranchListRequestIsFailed() throws Exception {
-        final List<Remote> remotes = new ArrayList<>();
-        remotes.add(mock(Remote.class));
+    when(view.getRepositoryName()).thenReturn(REPOSITORY_NAME);
+    when(view.getRepositoryUrl()).thenReturn(REMOTE_URI);
+    when(view.getLocalBranch()).thenReturn(LOCAL_BRANCH);
+    when(view.getRemoteBranch()).thenReturn(REMOTE_BRANCH);
+    when(branch.getName()).thenReturn(REMOTE_BRANCH);
+  }
 
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                AsyncRequestCallback<List<Remote>> callback = (AsyncRequestCallback<List<Remote>>)arguments[3];
-                @SuppressWarnings("NonJREEmulationClassesInClientCode")
-                Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-                onSuccess.invoke(callback, remotes);
-                return callback;
-            }
-        }).when(service).remoteList(eq(devMachine), anyObject(), anyString(), anyBoolean(),
-                                    (AsyncRequestCallback<List<Remote>>)anyObject());
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                AsyncRequestCallback<List<Branch>> callback = (AsyncRequestCallback<List<Branch>>)arguments[2];
-                Method onFailure = GwtReflectionUtils.getMethod(callback.getClass(), "onFailure");
-                onFailure.invoke(callback, mock(Throwable.class));
-                return callback;
-            }
-        }).doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                AsyncRequestCallback<List<Branch>> callback = (AsyncRequestCallback<List<Branch>>)arguments[2];
-                @SuppressWarnings("NonJREEmulationClassesInClientCode")
-                Method onFailure = GwtReflectionUtils.getMethod(callback.getClass(), "onFailure");
-                onFailure.invoke(callback, mock(Throwable.class));
-                return callback;
-            }
-        }).when(service).branchList(devMachine, anyObject(), anyString(), (AsyncRequestCallback<List<Branch>>)anyObject());
+  @Test
+  public void testShowDialogWhenBranchListRequestIsSuccessful() throws Exception {
+    final List<Remote> remotes = new ArrayList<>();
+    remotes.add(mock(Remote.class));
+    final List<Branch> branches = new ArrayList<>();
+    branches.add(branch);
 
-        presenter.showDialog();
+    presenter.showDialog(project);
 
-        verify(appContext).getCurrentProject();
-        verify(service).remoteList(eq(devMachine), eq(rootProjectConfig), anyString(), eq(SHOW_ALL_INFORMATION),
-                                   (AsyncRequestCallback<List<Remote>>)anyObject());
-        verify(constant).branchesListFailed();
-        verify(gitOutputConsoleFactory).create(FETCH_COMMAND_NAME);
-        verify(console).printError(anyString());
-        verify(consolesPanelPresenter).addCommandOutput(anyString(), eq(console));
-        verify(notificationManager).notify(anyString(), rootProjectConfig);
-        verify(view).setEnableFetchButton(eq(DISABLE_BUTTON));
-    }
+    verify(remoteListPromise).then(remoteListCaptor.capture());
+    remoteListCaptor.getValue().apply(remotes);
 
-    @Test
-    public void testShowDialogWhenRemoteListRequestIsFailed() throws Exception {
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                AsyncRequestCallback<List<Remote>> callback = (AsyncRequestCallback<List<Remote>>)arguments[3];
-                @SuppressWarnings("NonJREEmulationClassesInClientCode")
-                Method onFailure = GwtReflectionUtils.getMethod(callback.getClass(), "onFailure");
-                onFailure.invoke(callback, mock(Throwable.class));
-                return callback;
-            }
-        }).when(service).remoteList(devMachine, anyObject(), anyString(), anyBoolean(),
-                                    (AsyncRequestCallback<List<Remote>>)anyObject());
+    verify(branchListPromise).then(branchListCaptor.capture());
+    branchListCaptor.getValue().apply(branches);
 
-        presenter.showDialog();
+    verify(branchListPromise, times(2)).then(branchListCaptor.capture());
+    branchListCaptor.getValue().apply(branches);
 
-        verify(appContext).getCurrentProject();
-        verify(service).remoteList(eq(devMachine), eq(rootProjectConfig), anyString(), eq(SHOW_ALL_INFORMATION),
-                                   (AsyncRequestCallback<List<Remote>>)anyObject());
-        verify(constant).remoteListFailed();
-        verify(view).setEnableFetchButton(eq(DISABLE_BUTTON));
-    }
+    verify(view).setEnableFetchButton(eq(ENABLE_BUTTON));
+    verify(view).setRepositories(anyObject());
+    verify(view).setRemoveDeleteRefs(eq(NO_REMOVE_DELETE_REFS));
+    verify(view).setFetchAllBranches(eq(FETCH_ALL_BRANCHES));
+    verify(view).showDialog();
+    verify(view).setRemoteBranches(anyObject());
+    verify(view).setLocalBranches(anyObject());
+  }
 
-    @Test
-    public void testOnFetchClickedWhenFetchWSRequestIsSuccessful() throws Exception {
-        when(view.getRepositoryUrl()).thenReturn(REMOTE_URI);
-        when(view.getRepositoryName()).thenReturn(REPOSITORY_NAME, REPOSITORY_NAME);
-        when(view.isRemoveDeletedRefs()).thenReturn(NO_REMOVE_DELETE_REFS);
-        when(view.getLocalBranch()).thenReturn(LOCAL_BRANCH);
-        when(view.getRemoteBranch()).thenReturn(REMOTE_BRANCH);
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                RequestCallback<String> callback = (RequestCallback<String>)arguments[4];
-                @SuppressWarnings("NonJREEmulationClassesInClientCode")
-                Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-                onSuccess.invoke(callback, EMPTY_TEXT);
-                return callback;
-            }
-        }).when(service).fetch(devMachine, anyObject(), anyString(), (List<String>)anyObject(), anyBoolean(),
-                               (RequestCallback<String>)anyObject());
+  @Test
+  public void testOnValueChanged() throws Exception {
+    when(view.isFetchAllBranches()).thenReturn(FETCH_ALL_BRANCHES);
+    presenter.onValueChanged();
 
-        presenter.showDialog();
-        presenter.onFetchClicked();
+    verify(view).setEnableLocalBranchField(eq(DISABLE_FIELD));
+    verify(view).setEnableRemoteBranchField(eq(DISABLE_FIELD));
 
-        verify(service).fetch(eq(devMachine), eq(rootProjectConfig), eq(REPOSITORY_NAME), (List<String>)anyObject(),
-                              eq(NO_REMOVE_DELETE_REFS), (RequestCallback<String>)anyObject());
-        verify(view).close();
-        verify(gitOutputConsoleFactory).create(FETCH_COMMAND_NAME);
-        verify(console).print(anyString());
-        verify(consolesPanelPresenter).addCommandOutput(anyString(), eq(console));
-        verify(notificationManager).notify(anyString(), rootProjectConfig);
-        verify(constant, times(2)).fetchSuccess(eq(REMOTE_URI));
-    }
+    when(view.isFetchAllBranches()).thenReturn(!FETCH_ALL_BRANCHES);
+    presenter.onValueChanged();
 
-    @Test
-    public void testOnFetchClickedWhenFetchWSRequestIsFailed() throws Exception {
-        when(view.getRepositoryUrl()).thenReturn(REMOTE_URI);
-        when(view.getRepositoryName()).thenReturn(REPOSITORY_NAME, REPOSITORY_NAME);
-        when(view.isRemoveDeletedRefs()).thenReturn(NO_REMOVE_DELETE_REFS);
-        when(view.getLocalBranch()).thenReturn(LOCAL_BRANCH);
-        when(view.getRemoteBranch()).thenReturn(REMOTE_BRANCH);
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                RequestCallback<String> callback = (RequestCallback<String>)arguments[4];
-                @SuppressWarnings("NonJREEmulationClassesInClientCode")
-                Method onFailure = GwtReflectionUtils.getMethod(callback.getClass(), "onFailure");
-                onFailure.invoke(callback, mock(Throwable.class));
-                return callback;
-            }
-        }).when(service).fetch(devMachine, anyObject(), anyString(), (List<String>)anyObject(), anyBoolean(),
-                               (RequestCallback<String>)anyObject());
+    verify(view).setEnableLocalBranchField(eq(ENABLE_FIELD));
+    verify(view).setEnableRemoteBranchField(eq(ENABLE_FIELD));
+  }
 
-        presenter.showDialog();
-        presenter.onFetchClicked();
+  @Test
+  public void testOnCancelClicked() throws Exception {
+    presenter.onCancelClicked();
 
-        verify(service).fetch(eq(devMachine), eq(rootProjectConfig), eq(REPOSITORY_NAME), (List<String>)anyObject(),
-                              eq(NO_REMOVE_DELETE_REFS), (RequestCallback<String>)anyObject());
-        verify(view).close();
-        verify(constant, times(2)).fetchFail(eq(REMOTE_URI));
-        verify(gitOutputConsoleFactory).create(FETCH_COMMAND_NAME);
-        verify(console).printError(anyString());
-        verify(consolesPanelPresenter).addCommandOutput(anyString(), eq(console));
-        verify(notificationManager).notify(anyString(), rootProjectConfig);
-    }
+    verify(view).close();
+  }
 
-    @Test
-    public void testOnValueChanged() throws Exception {
-        when(view.isFetchAllBranches()).thenReturn(FETCH_ALL_BRANCHES);
-        presenter.onValueChanged();
+  @Test
+  public void shouldRefreshRemoteBranchesWhenRepositoryIsChanged() throws Exception {
+    final List<Remote> remotes = new ArrayList<>();
+    remotes.add(mock(Remote.class));
+    final List<Branch> branches = new ArrayList<>();
+    branches.add(branch);
+    when(branch.isActive()).thenReturn(ACTIVE_BRANCH);
 
-        verify(view).setEnableLocalBranchField(eq(DISABLE_FIELD));
-        verify(view).setEnableRemoteBranchField(eq(DISABLE_FIELD));
+    presenter.showDialog(project);
+    presenter.onRemoteRepositoryChanged();
 
-        when(view.isFetchAllBranches()).thenReturn(!FETCH_ALL_BRANCHES);
-        presenter.onValueChanged();
+    verify(branchListPromise).then(branchListCaptor.capture());
+    branchListCaptor.getValue().apply(branches);
 
-        verify(view).setEnableLocalBranchField(eq(ENABLE_FIELD));
-        verify(view).setEnableRemoteBranchField(eq(ENABLE_FIELD));
-    }
+    verify(branchListPromise, times(2)).then(branchListCaptor.capture());
+    branchListCaptor.getValue().apply(branches);
 
-    @Test
-    public void testOnCancelClicked() throws Exception {
-        presenter.onCancelClicked();
-
-        verify(view).close();
-    }
-
-    @Test
-    public void shouldRefreshRemoteBranchesWhenRepositoryIsChanged() throws Exception {
-        final List<Remote> remotes = new ArrayList<>();
-        remotes.add(mock(Remote.class));
-        final List<Branch> branches = new ArrayList<>();
-        branches.add(branch);
-        when(branch.isActive()).thenReturn(ACTIVE_BRANCH);
-
-        doAnswer(new Answer() {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable {
-                Object[] arguments = invocation.getArguments();
-                AsyncRequestCallback<List<Branch>> callback = (AsyncRequestCallback<List<Branch>>)arguments[2];
-                @SuppressWarnings("NonJREEmulationClassesInClientCode")
-                Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-                onSuccess.invoke(callback, branches);
-                return callback;
-            }
-        }).when(service).branchList(devMachine, anyObject(), anyString(), (AsyncRequestCallback<List<Branch>>)anyObject());
-
-        presenter.onRemoteRepositoryChanged();
-
-        verify(service, times(2))
-                .branchList(eq(devMachine), eq(rootProjectConfig), anyString(), (AsyncRequestCallback<List<Branch>>)anyObject());
-        verify(view).setRemoteBranches((List<String>)anyObject());
-        verify(view).setLocalBranches((List<String>)anyObject());
-        verify(view).selectRemoteBranch(anyString());
-    }
+    verify(view).setRemoteBranches(anyObject());
+    verify(view).setLocalBranches(anyObject());
+    verify(view).selectRemoteBranch(anyString());
+  }
 }

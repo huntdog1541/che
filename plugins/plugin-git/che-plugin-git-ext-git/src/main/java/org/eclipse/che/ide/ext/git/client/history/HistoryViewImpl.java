@@ -1,308 +1,210 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.git.client.history;
 
-import com.google.gwt.cell.client.Cell;
 import com.google.gwt.cell.client.TextCell;
-import com.google.gwt.event.dom.client.ClickEvent;
-import com.google.gwt.i18n.client.DateTimeFormat;
-import com.google.gwt.safehtml.shared.SafeHtmlBuilder;
+import com.google.gwt.core.client.GWT;
+import com.google.gwt.event.dom.client.DoubleClickEvent;
+import com.google.gwt.event.dom.client.ScrollEvent;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.uibinder.client.UiHandler;
 import com.google.gwt.user.cellview.client.CellTable;
 import com.google.gwt.user.cellview.client.Column;
 import com.google.gwt.user.client.ui.Button;
-import com.google.gwt.user.client.ui.DockLayoutPanel;
-import com.google.gwt.user.client.ui.HTML;
+import com.google.gwt.user.client.ui.ScrollPanel;
 import com.google.gwt.user.client.ui.TextArea;
-import com.google.gwt.user.client.ui.TextBox;
-import com.google.gwt.user.client.ui.UIObject;
 import com.google.gwt.user.client.ui.Widget;
-import com.google.gwt.view.client.SelectionChangeEvent;
 import com.google.gwt.view.client.SingleSelectionModel;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-
+import java.util.List;
 import org.eclipse.che.api.git.shared.Revision;
-import org.eclipse.che.ide.Resources;
-import org.eclipse.che.ide.api.parts.PartStackUIResources;
-import org.eclipse.che.ide.api.parts.base.BaseView;
+import org.eclipse.che.ide.ext.git.client.DateTimeFormatter;
 import org.eclipse.che.ide.ext.git.client.GitLocalizationConstant;
 import org.eclipse.che.ide.ext.git.client.GitResources;
-import org.vectomatic.dom.svg.ui.SVGImage;
-
-import javax.validation.constraints.NotNull;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import org.eclipse.che.ide.ui.window.Window;
 
 /**
  * The implementation of {@link HistoryView}.
  *
- * @author Andrey Plotnikov
- * @author Vlad Zhukovskyi
+ * @author Igor Vinokur
  */
 @Singleton
-public class HistoryViewImpl extends BaseView<HistoryView.ActionDelegate> implements HistoryView {
+public class HistoryViewImpl extends Window implements HistoryView {
+  interface HistoryListViewImplUiBinder extends UiBinder<Widget, HistoryViewImpl> {}
 
-    interface HistoryViewImplUiBinder extends UiBinder<Widget, HistoryViewImpl> {
+  private static HistoryListViewImplUiBinder uiBinder =
+      GWT.create(HistoryListViewImplUiBinder.class);
+
+  Button btnClose;
+  Button btnCompare;
+
+  @UiField ScrollPanel revisionsPanel;
+  @UiField TextArea description;
+
+  @UiField(provided = true)
+  final GitLocalizationConstant locale;
+
+  @UiField(provided = true)
+  final GitResources res;
+
+  private ActionDelegate delegate;
+  private CellTable<Revision> revisions;
+  private SingleSelectionModel<Revision> selectionModel;
+
+  private final DateTimeFormatter dateTimeFormatter;
+
+  @Inject
+  protected HistoryViewImpl(
+      GitResources resources,
+      GitLocalizationConstant locale,
+      DateTimeFormatter dateTimeFormatter,
+      org.eclipse.che.ide.Resources coreRes) {
+    this.res = resources;
+    this.locale = locale;
+    this.dateTimeFormatter = dateTimeFormatter;
+    this.ensureDebugId("git-history-window");
+
+    Widget widget = uiBinder.createAndBindUi(this);
+
+    this.setTitle(locale.historyTitle());
+    this.setWidget(widget);
+
+    revisionsPanel.getElement().setTabIndex(-1);
+    description.setReadOnly(true);
+
+    createRevisionsTable(coreRes);
+    createButtons();
+  }
+
+  @Override
+  public void setDelegate(ActionDelegate delegate) {
+    this.delegate = delegate;
+  }
+
+  @Override
+  public void setRevisions(List<Revision> revisions) {
+    this.revisions.setRowData(revisions);
+    if (selectionModel.getSelectedObject() == null) {
+      delegate.onRevisionUnselected();
     }
+    // if the size of the panel is greater then the size of the loaded list of the history then no
+    // scroller has been appeared yet
+    onPanelScrolled(null);
+  }
 
-    @UiField
-    DockLayoutPanel     dataCommitBPanel;
-    @UiField
-    DockLayoutPanel     revisionCommitBPanel;
-    @UiField
-    HTML                compareType;
-    @UiField
-    TextBox             commitARevision;
-    @UiField
-    TextBox             commitADate;
-    @UiField
-    TextBox             commitBRevision;
-    @UiField
-    TextBox             commitBDate;
-    @UiField
-    TextArea            editor;
-    @UiField(provided = true)
-    CellTable<Revision> commits;
-    @UiField
-    Button              btnRefresh;
-    @UiField
-    Button              btnProjectChanges;
-    @UiField
-    Button              btnResourceChanges;
-    @UiField
-    Button              btnDiffWithIndex;
-    @UiField
-    Button              btnDiffWithWorkTree;
-    @UiField
-    Button              btnDiffWithPrevCommit;
-    @UiField(provided = true)
-    final GitResources            res;
-    @UiField(provided = true)
-    final GitLocalizationConstant locale;
+  @Override
+  public void setEnableCompareButton(boolean enabled) {
+    btnCompare.setEnabled(enabled);
+  }
 
-    /**
-     * Create view.
-     *
-     * @param resources
-     * @param locale
-     * @param partStackUIResources
-     */
-    @Inject
-    protected HistoryViewImpl(final GitResources resources,
-                              final GitLocalizationConstant locale,
-                              final PartStackUIResources partStackUIResources,
-                              final Resources res,
-                              final HistoryViewImplUiBinder uiBinder) {
-        super(partStackUIResources);
+  @Override
+  public void setDescription(String description) {
+    this.description.setText(description);
+  }
 
-        this.res = resources;
-        this.locale = locale;
+  @Override
+  public void close() {
+    hide();
+  }
 
-        createCommitsTable(res);
-        setContentWidget(uiBinder.createAndBindUi(this));
-        minimizeButton.ensureDebugId("git-showHistory-minimizeBut");
+  @Override
+  protected void onHide() {
+    selectionModel.clear();
+  }
 
-        btnProjectChanges.getElement().appendChild(new SVGImage(resources.projectLevel()).getElement());
-        btnResourceChanges.getElement().appendChild(new SVGImage(resources.resourceLevel()).getElement());
-        btnDiffWithIndex.getElement().appendChild(new SVGImage(resources.diffIndex()).getElement());
-        btnDiffWithWorkTree.getElement().appendChild(new SVGImage(resources.diffWorkTree()).getElement());
-        btnDiffWithPrevCommit.getElement().appendChild(new SVGImage(resources.diffPrevVersion()).getElement());
-        btnRefresh.getElement().appendChild(new SVGImage(resources.refresh()).getElement());
-    }
+  @Override
+  public void showDialog() {
+    this.show();
+  }
 
-    /** Creates table what contains list of available commits.
-     * @param res*/
-    private void createCommitsTable(Resources res) {
-        commits = new CellTable<Revision>(15, res);
-
-        Column<Revision, String> dateColumn = new Column<Revision, String>(new TextCell()) {
-            @Override
-            public String getValue(Revision revision) {
-                return DateTimeFormat.getFormat(DateTimeFormat.PredefinedFormat.DATE_TIME_MEDIUM).format(
-                        new Date((long)revision.getCommitTime()));
-            }
-
-            @Override
-            public void render(Cell.Context context, Revision revision, SafeHtmlBuilder sb) {
-                sb.appendHtmlConstant("<div id=\"" + UIObject.DEBUG_ID_PREFIX + "git-showHistory-table-" + context.getIndex() + "\">");
-                super.render(context, revision, sb);
-            }
+  private void createRevisionsTable(org.eclipse.che.ide.Resources coreRes) {
+    Column<Revision, String> idColumn =
+        new Column<Revision, String>(new TextCell()) {
+          @Override
+          public String getValue(Revision revision) {
+            return revision.getId().substring(0, 8) + "...";
+          }
         };
-        Column<Revision, String> commiterColumn = new Column<Revision, String>(new TextCell()) {
-            @Override
-            public String getValue(Revision revision) {
-                if (revision.getCommitter() == null) {
-                    return "";
-                }
-                return revision.getCommitter().getName();
-            }
-
+    Column<Revision, String> timeColumn =
+        new Column<Revision, String>(new TextCell()) {
+          @Override
+          public String getValue(Revision revision) {
+            return dateTimeFormatter.getFormattedDate(revision.getCommitTime());
+          }
         };
-        Column<Revision, String> commentColumn = new Column<Revision, String>(new TextCell()) {
-            @Override
-            public String getValue(Revision revision) {
-                return revision.getMessage();
-            }
+    Column<Revision, String> authorColumn =
+        new Column<Revision, String>(new TextCell()) {
+          @Override
+          public String getValue(Revision revision) {
+            return revision.getAuthor().getName();
+          }
+        };
+    Column<Revision, String> titleColumn =
+        new Column<Revision, String>(new TextCell()) {
+          @Override
+          public String getValue(Revision revision) {
+            return revision.getMessage().substring(0, 50);
+          }
         };
 
-        commits.addColumn(dateColumn, locale.commitGridDate());
-        commits.setColumnWidth(dateColumn, "20%");
-        commits.addColumn(commiterColumn, locale.commitGridCommiter());
-        commits.setColumnWidth(commiterColumn, "30%");
-        commits.addColumn(commentColumn, locale.commitGridComment());
-        commits.setColumnWidth(commentColumn, "50%");
+    revisions = new CellTable<>(15, coreRes);
 
-        final SingleSelectionModel<Revision> selectionModel = new SingleSelectionModel<Revision>();
-        selectionModel.addSelectionChangeHandler(new SelectionChangeEvent.Handler() {
-            @Override
-            public void onSelectionChange(SelectionChangeEvent event) {
-                Revision selectedObject = selectionModel.getSelectedObject();
-                delegate.onRevisionSelected(selectedObject);
-            }
+    revisions.setWidth("100%");
+
+    revisions.addColumn(idColumn, locale.viewCompareRevisionTableIdTitle());
+    revisions.addColumn(timeColumn, locale.viewCompareRevisionTableTimeTitle());
+    revisions.addColumn(authorColumn, locale.viewCompareRevisionTableAuthorTitle());
+    revisions.addColumn(titleColumn, locale.viewCompareRevisionTableTitleTitle());
+
+    selectionModel = new SingleSelectionModel<>();
+    selectionModel.addSelectionChangeHandler(
+        event -> {
+          description.setText(selectionModel.getSelectedObject().getMessage());
+          delegate.onRevisionSelected(selectionModel.getSelectedObject());
         });
-        commits.setSelectionModel(selectionModel);
+    revisions.setSelectionModel(selectionModel);
+
+    revisions.addDomHandler(
+        event -> delegate.onRevisionDoubleClicked(), DoubleClickEvent.getType());
+
+    this.revisionsPanel.add(revisions);
+  }
+
+  private void createButtons() {
+    btnClose =
+        addFooterButton(
+            locale.buttonClose(), "git-history-close", event -> delegate.onCloseClicked());
+
+    btnCompare =
+        addFooterButton(
+            locale.buttonCompare(),
+            "git-history-compare",
+            event -> delegate.onCompareClicked(),
+            true);
+  }
+
+  @UiHandler("revisionsPanel")
+  public void onPanelScrolled(ScrollEvent ignored) {
+    // We cannot rely on exact equality of scroll positions because GWT sometimes round such values
+    // and it is possible that the actual max scroll position is a pixel less then declared.
+    if (revisionsPanel.getMaximumVerticalScrollPosition()
+            - revisionsPanel.getVerticalScrollPosition()
+        <= 1) {
+      // to avoid autoscrolling to selected item
+      revisionsPanel.getElement().focus();
+
+      delegate.onScrolledToButton();
     }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setRevisions(@NotNull List<Revision> revisions) {
-        // Wraps Array in java.util.List
-        List<Revision> list = new ArrayList<>();
-        for (Revision revision : revisions) {
-            list.add(revision);
-        }
-        this.commits.setRowData(list);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void selectProjectChangesButton(boolean selected) {
-        btnProjectChanges.setEnabled(!selected);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void selectResourceChangesButton(boolean selected) {
-        btnResourceChanges.setEnabled(!selected);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void selectDiffWithIndexButton(boolean selected) {
-        btnDiffWithIndex.setEnabled(!selected);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void selectDiffWithWorkingTreeButton(boolean selected) {
-        btnDiffWithWorkTree.setEnabled(!selected);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void selectDiffWithPrevVersionButton(boolean selected) {
-        btnDiffWithPrevCommit.setEnabled(!selected);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setCommitADate(@NotNull String date) {
-        commitADate.setText(date);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setCommitBDate(@NotNull String date) {
-        commitBDate.setText(date);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setCommitARevision(@NotNull String revision) {
-        commitARevision.setText(revision);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setCommitBRevision(@NotNull String revision) {
-        commitBRevision.setText(revision);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setCompareType(@NotNull String type) {
-        compareType.setHTML(type);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setDiffContext(@NotNull String diffContext) {
-        editor.setText(diffContext);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setCommitBPanelVisible(boolean visible) {
-        revisionCommitBPanel.setVisible(visible);
-        dataCommitBPanel.setVisible(visible);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void clear() {
-        dataCommitBPanel.clear();
-        revisionCommitBPanel.clear();
-        commitARevision.setText("");
-        commitBRevision.setText("");
-        commitADate.setText("");
-        commitBDate.setText("");
-        compareType.setText("");
-
-        setDiffContext("");
-
-        List<Revision> list = new ArrayList<Revision>();
-        commits.setRowData(list);
-    }
-
-    @UiHandler("btnRefresh")
-    public void onRefreshClicked(ClickEvent event) {
-        delegate.onRefreshClicked();
-    }
-
-    @UiHandler("btnProjectChanges")
-    public void onProjectChangesClick(ClickEvent event) {
-        delegate.onProjectChangesClicked();
-    }
-
-    @UiHandler("btnResourceChanges")
-    public void onResourceChangesClicked(ClickEvent event) {
-        delegate.onResourceChangesClicked();
-    }
-
-    @UiHandler("btnDiffWithIndex")
-    public void onDiffWithIndexClicked(ClickEvent event) {
-        delegate.onDiffWithIndexClicked();
-    }
-
-    @UiHandler("btnDiffWithWorkTree")
-    public void onDiffWithWorkTreeClicked(ClickEvent event) {
-        delegate.onDiffWithWorkTreeClicked();
-    }
-
-    @UiHandler("btnDiffWithPrevCommit")
-    public void onDiffWithPrevCommitClicked(ClickEvent event) {
-        delegate.onDiffWithPrevCommitClicked();
-    }
+  }
 }

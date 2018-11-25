@@ -1,20 +1,29 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.plugin.java.plain.server.projecttype;
 
+import static org.eclipse.che.api.fs.server.WsPathUtils.absolutize;
+import static org.eclipse.che.ide.ext.java.shared.Constants.JAVAC;
+import static org.eclipse.che.plugin.java.plain.shared.PlainJavaProjectConstants.LIBRARY_FOLDER;
+
+import com.google.inject.Inject;
+import com.google.inject.Provider;
+import java.util.Arrays;
+import java.util.List;
 import org.eclipse.che.api.core.ServerException;
-import org.eclipse.che.jdt.core.launching.JREContainerInitializer;
+import org.eclipse.che.api.core.model.workspace.config.ProjectConfig;
+import org.eclipse.che.api.project.server.ProjectManager;
+import org.eclipse.che.ide.ext.java.shared.Constants;
 import org.eclipse.che.plugin.java.server.projecttype.AbstractJavaInitHandler;
-import org.eclipse.core.resources.IFolder;
-import org.eclipse.core.runtime.Path;
 import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.JavaCore;
@@ -22,64 +31,60 @@ import org.eclipse.jdt.core.JavaModelException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import static org.eclipse.che.plugin.java.plain.shared.PlainJavaProjectConstants.DEFAULT_SOURCE_FOLDER_VALUE;
-import static org.eclipse.che.plugin.java.plain.shared.PlainJavaProjectConstants.PLAIN_JAVA_PROJECT_ID;
-
 /**
- * Init handler for simple java project.
- * Initialize classpath with JRE classpath entry container and 'src' source classpath entry.
+ * Init handler for simple java project. Initialize classpath with JRE classpath entry container and
+ * 'src' source classpath entry.
  *
  * @author Evgen Vidolob
  * @author Valeriy Svydenko
  */
 public class PlainJavaInitHandler extends AbstractJavaInitHandler {
 
-    private static final Logger LOG = LoggerFactory.getLogger(PlainJavaInitHandler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(PlainJavaInitHandler.class);
+  private final ClasspathBuilder classpathBuilder;
+  private final Provider<ProjectManager> projectRegistryProvider;
 
-    @Override
-    protected void initializeClasspath(IJavaProject javaProject) throws ServerException {
-        IClasspathEntry[] projectClasspath;
-        try {
-            projectClasspath = javaProject.getRawClasspath();
-        } catch (JavaModelException e) {
-            LOG.warn("Can't get classpath for: " + javaProject.getProject().getFullPath().toOSString(), e);
-            throw new ServerException(e);
-        }
+  @Inject
+  public PlainJavaInitHandler(
+      ClasspathBuilder classpathBuilder, Provider<ProjectManager> projectRegistryProvider) {
+    this.classpathBuilder = classpathBuilder;
+    this.projectRegistryProvider = projectRegistryProvider;
+  }
 
-        //default classpath
-        IClasspathEntry[] defaultClasspath = new IClasspathEntry[]{JavaCore.newSourceEntry(javaProject.getPath())};
-        if (!Arrays.equals(defaultClasspath, projectClasspath)) {
-            //classpath is already initialized
-            return;
-        }
-
-        List<IClasspathEntry> classpathEntries = new ArrayList<>();
-        //create classpath container for default JRE
-        IClasspathEntry jreContainer = JavaCore.newContainerEntry(new Path(JREContainerInitializer.JRE_CONTAINER));
-        classpathEntries.add(jreContainer);
-
-        //by default in simple java project sources placed in 'src' folder
-        IFolder src = javaProject.getProject().getFolder(DEFAULT_SOURCE_FOLDER_VALUE);
-        //if 'src' folder exist add this folder as source classpath entry
-        if (src.exists()) {
-            IClasspathEntry sourceEntry = JavaCore.newSourceEntry(src.getFullPath());
-            classpathEntries.add(sourceEntry);
-        }
-
-        try {
-            javaProject.setRawClasspath(classpathEntries.toArray(new IClasspathEntry[classpathEntries.size()]), null);
-        } catch (JavaModelException e) {
-            LOG.warn("Can't set classpath for: " + javaProject.getProject().getFullPath().toOSString(), e);
-            throw new ServerException(e);
-        }
+  @Override
+  protected void initializeClasspath(IJavaProject javaProject) throws ServerException {
+    IClasspathEntry[] projectClasspath;
+    try {
+      projectClasspath = javaProject.getRawClasspath();
+    } catch (JavaModelException e) {
+      LOG.warn(
+          "Can't get classpath for: " + javaProject.getProject().getFullPath().toOSString(), e);
+      throw new ServerException(e);
     }
 
-    @Override
-    public String getProjectType() {
-        return PLAIN_JAVA_PROJECT_ID;
+    // default classpath
+    IClasspathEntry[] defaultClasspath =
+        new IClasspathEntry[] {JavaCore.newSourceEntry(javaProject.getPath())};
+    if (!Arrays.equals(defaultClasspath, projectClasspath)) {
+      // classpath is already initialized
+      return;
     }
+
+    String wsPath = absolutize(javaProject.getPath().toOSString());
+    ProjectConfig project =
+        projectRegistryProvider
+            .get()
+            .get(wsPath)
+            .orElseThrow(() -> new ServerException("Can't find a project: " + wsPath));
+
+    List<String> sourceFolders = project.getAttributes().get(Constants.SOURCE_FOLDER);
+    List<String> library = project.getAttributes().get(LIBRARY_FOLDER);
+
+    classpathBuilder.generateClasspath(javaProject, sourceFolders, library);
+  }
+
+  @Override
+  public String getProjectType() {
+    return JAVAC;
+  }
 }

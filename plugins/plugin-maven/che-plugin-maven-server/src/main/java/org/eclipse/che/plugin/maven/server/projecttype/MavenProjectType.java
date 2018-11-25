@@ -1,24 +1,24 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.plugin.maven.server.projecttype;
-
-import com.google.inject.Inject;
-import org.eclipse.che.api.project.server.type.ProjectTypeDef;
-import org.eclipse.che.plugin.maven.shared.MavenAttributes;
-
-import javax.inject.Singleton;
 
 import static org.eclipse.che.ide.ext.java.shared.Constants.JAVA_ID;
 import static org.eclipse.che.ide.ext.java.shared.Constants.OUTPUT_FOLDER;
 import static org.eclipse.che.ide.ext.java.shared.Constants.SOURCE_FOLDER;
+
+import com.google.inject.Inject;
+import javax.inject.Singleton;
+import org.eclipse.che.api.project.server.type.ProjectTypeDef;
+import org.eclipse.che.plugin.maven.shared.MavenAttributes;
 
 /**
  * @author Evgen Vidolob
@@ -28,24 +28,24 @@ import static org.eclipse.che.ide.ext.java.shared.Constants.SOURCE_FOLDER;
 @Singleton
 public class MavenProjectType extends ProjectTypeDef {
 
-    @Inject
-    public MavenProjectType(MavenValueProviderFactory mavenValueProviderFactory) {
+  @Inject
+  public MavenProjectType(MavenValueProviderFactory mavenValueProviderFactory) {
 
-        super(MavenAttributes.MAVEN_ID, MavenAttributes.MAVEN_NAME, true, false, true);
+    super(MavenAttributes.MAVEN_ID, MavenAttributes.MAVEN_NAME, true, false, true);
 
-        addVariableDefinition(MavenAttributes.GROUP_ID, "", false, mavenValueProviderFactory);
-        addVariableDefinition(MavenAttributes.ARTIFACT_ID, "", true, mavenValueProviderFactory);
-        addVariableDefinition(MavenAttributes.VERSION, "", false, mavenValueProviderFactory);
-        addVariableDefinition(MavenAttributes.PARENT_VERSION, "", false, mavenValueProviderFactory);
-        addVariableDefinition(MavenAttributes.PARENT_ARTIFACT_ID, "", false, mavenValueProviderFactory);
-        addVariableDefinition(MavenAttributes.PARENT_GROUP_ID, "", false, mavenValueProviderFactory);
-        addVariableDefinition(MavenAttributes.PACKAGING, "", false, mavenValueProviderFactory);
-        addVariableDefinition(MavenAttributes.TEST_SOURCE_FOLDER, "", false, mavenValueProviderFactory);
-        addVariableDefinition(MavenAttributes.RESOURCE_FOLDER, "", false, mavenValueProviderFactory);
+    addVariableDefinition(SOURCE_FOLDER, "source folder", true, mavenValueProviderFactory);
+    addVariableDefinition(OUTPUT_FOLDER, "output folder", false, mavenValueProviderFactory);
 
-        setValueProviderFactory(SOURCE_FOLDER, mavenValueProviderFactory);
-        setValueProviderFactory(OUTPUT_FOLDER, mavenValueProviderFactory);
+    addVariableDefinition(MavenAttributes.GROUP_ID, "", false, mavenValueProviderFactory);
+    addVariableDefinition(MavenAttributes.ARTIFACT_ID, "", true, mavenValueProviderFactory);
+    addVariableDefinition(MavenAttributes.VERSION, "", false, mavenValueProviderFactory);
+    addVariableDefinition(MavenAttributes.PARENT_VERSION, "", false, mavenValueProviderFactory);
+    addVariableDefinition(MavenAttributes.PARENT_ARTIFACT_ID, "", false, mavenValueProviderFactory);
+    addVariableDefinition(MavenAttributes.PARENT_GROUP_ID, "", false, mavenValueProviderFactory);
+    addVariableDefinition(MavenAttributes.PACKAGING, "", false, mavenValueProviderFactory);
+    addVariableDefinition(MavenAttributes.TEST_SOURCE_FOLDER, "", false, mavenValueProviderFactory);
+    addVariableDefinition(MavenAttributes.RESOURCE_FOLDER, "", false, mavenValueProviderFactory);
 
-        addParent(JAVA_ID);
-    }
+    addParent(JAVA_ID);
+  }
 }

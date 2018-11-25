@@ -1,19 +1,21 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.plugin.gdb.server.parser;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.eclipse.che.plugin.gdb.server.exception.GdbParseException;
 
 /**
  * 'info locals' command parser.
@@ -22,35 +24,33 @@ import java.util.regex.Pattern;
  */
 public class GdbInfoLocals {
 
-    private static final Pattern GDB_VARS = Pattern.compile("(.*) = (.*)");
+  private static final Pattern GDB_VARS = Pattern.compile("(.*) = (.*)");
 
-    private final Map<String, String> variables;
+  private final Map<String, String> variables;
 
-    public GdbInfoLocals(Map<String, String> variables) {
-        this.variables = variables;
+  public GdbInfoLocals(Map<String, String> variables) {
+    this.variables = variables;
+  }
+
+  public Map<String, String> getVariables() {
+    return variables;
+  }
+
+  /** Factory method. */
+  public static GdbInfoLocals parse(GdbOutput gdbOutput) throws GdbParseException {
+    String output = gdbOutput.getOutput();
+
+    Map<String, String> variables = new HashMap<>();
+
+    for (String line : output.split("\n")) {
+      Matcher matcher = GDB_VARS.matcher(line);
+      if (matcher.find()) {
+        String variable = matcher.group(1);
+        String value = matcher.group(2);
+        variables.put(variable, value);
+      }
     }
 
-    public Map<String, String> getVariables() {
-        return variables;
-    }
-
-    /**
-     * Factory method.
-     */
-    public static GdbInfoLocals parse(GdbOutput gdbOutput) throws GdbParseException {
-        String output = gdbOutput.getOutput();
-
-        Map<String, String> variables = new HashMap<>();
-
-        for (String line : output.split("\n")) {
-            Matcher matcher = GDB_VARS.matcher(line);
-            if (matcher.find()) {
-                String variable = matcher.group(1);
-                String value = matcher.group(2);
-                variables.put(variable, value);
-            }
-        }
-
-        return new GdbInfoLocals(variables);
-    }
+    return new GdbInfoLocals(variables);
+  }
 }

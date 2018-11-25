@@ -1,159 +1,282 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.java.client.editor;
+
+import static org.eclipse.che.ide.ext.java.client.util.JavaUtil.resolveFQN;
+import static org.eclipse.che.ide.project.ResolvingProjectStateHolder.ResolvingProjectState.IN_PROGRESS;
 
 import com.google.inject.assistedinject.Assisted;
 import com.google.inject.assistedinject.AssistedInject;
 import com.google.web.bindery.event.shared.EventBus;
 import com.google.web.bindery.event.shared.HandlerRegistration;
-
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import javax.validation.constraints.NotNull;
 import org.eclipse.che.ide.api.editor.EditorWithErrors;
-import org.eclipse.che.ide.api.project.tree.VirtualFile;
-import org.eclipse.che.ide.api.editor.text.Region;
-import org.eclipse.che.ide.ext.java.client.event.DependencyUpdatedEvent;
-import org.eclipse.che.ide.ext.java.client.event.DependencyUpdatedEventHandler;
-import org.eclipse.che.ide.ext.java.client.projecttree.JavaSourceFolderUtil;
-import org.eclipse.che.ide.ext.java.shared.dto.Problem;
-import org.eclipse.che.ide.ext.java.shared.dto.ReconcileResult;
 import org.eclipse.che.ide.api.editor.annotation.AnnotationModel;
 import org.eclipse.che.ide.api.editor.document.Document;
 import org.eclipse.che.ide.api.editor.reconciler.DirtyRegion;
 import org.eclipse.che.ide.api.editor.reconciler.ReconcilingStrategy;
-import org.eclipse.che.ide.api.editor.texteditor.TextEditorPresenter;
+import org.eclipse.che.ide.api.editor.text.Region;
+import org.eclipse.che.ide.api.editor.texteditor.TextEditor;
+import org.eclipse.che.ide.api.resources.Project;
+import org.eclipse.che.ide.api.resources.Resource;
+import org.eclipse.che.ide.api.resources.VirtualFile;
+import org.eclipse.che.ide.ext.java.client.JavaLocalizationConstant;
+import org.eclipse.che.ide.ext.java.client.editor.ReconcileOperationEvent.ReconcileOperationHandler;
+import org.eclipse.che.ide.ext.java.client.project.classpath.ClasspathChangedEvent;
+import org.eclipse.che.ide.ext.java.client.project.classpath.ClasspathChangedEvent.ClasspathChangedHandler;
+import org.eclipse.che.ide.ext.java.shared.dto.HighlightedPosition;
+import org.eclipse.che.ide.ext.java.shared.dto.Problem;
+import org.eclipse.che.ide.ext.java.shared.dto.ReconcileResult;
+import org.eclipse.che.ide.project.ResolvingProjectStateHolder;
+import org.eclipse.che.ide.project.ResolvingProjectStateHolder.ResolvingProjectState;
+import org.eclipse.che.ide.project.ResolvingProjectStateHolder.ResolvingProjectStateListener;
+import org.eclipse.che.ide.project.ResolvingProjectStateHolderRegistry;
 import org.eclipse.che.ide.util.loging.Log;
 
-import javax.validation.constraints.NotNull;
-import java.util.List;
+public class JavaReconcilerStrategy
+    implements ReconcilingStrategy,
+        ResolvingProjectStateListener,
+        ReconcileOperationHandler,
+        ClasspathChangedHandler {
+  private final TextEditor editor;
+  private final JavaCodeAssistProcessor codeAssistProcessor;
+  private final AnnotationModel annotationModel;
+  private final SemanticHighlightRenderer highlighter;
+  private final ResolvingProjectStateHolderRegistry resolvingProjectStateHolderRegistry;
+  private final JavaLocalizationConstant localizationConstant;
+  private final EventBus eventBus;
+  private final JavaReconcileClient client;
 
-public class JavaReconcilerStrategy implements ReconcilingStrategy {
+  private EditorWithErrors editorWithErrors;
+  private ResolvingProjectStateHolder resolvingProjectStateHolder;
+  private HashSet<HandlerRegistration> handlerRegistrations = new HashSet<>(2);
 
-
-    private final TextEditorPresenter<?>    editor;
-    private final JavaCodeAssistProcessor   codeAssistProcessor;
-    private final AnnotationModel           annotationModel;
-    private final HandlerRegistration       handlerRegistration;
-    private       SemanticHighlightRenderer highlighter;
-    private       JavaReconcileClient       client;
-    private       VirtualFile               file;
-    private boolean first = true;
-
-    @AssistedInject
-    public JavaReconcilerStrategy(@Assisted @NotNull final TextEditorPresenter<?> editor,
-                                  @Assisted final JavaCodeAssistProcessor codeAssistProcessor,
-                                  @Assisted final AnnotationModel annotationModel,
-                                  final JavaReconcileClient client,
-                                  final SemanticHighlightRenderer highlighter,
-                                  EventBus eventBus) {
-        this.editor = editor;
-        this.client = client;
-        this.codeAssistProcessor = codeAssistProcessor;
-        this.annotationModel = annotationModel;
-        this.highlighter = highlighter;
-
-        handlerRegistration = eventBus.addHandler(DependencyUpdatedEvent.TYPE, new DependencyUpdatedEventHandler() {
-            @Override
-            public void onDependencyUpdated(DependencyUpdatedEvent event) {
-                parse();
-            }
-        });
+  @AssistedInject
+  public JavaReconcilerStrategy(
+      @Assisted @NotNull final TextEditor editor,
+      @Assisted final JavaCodeAssistProcessor codeAssistProcessor,
+      @Assisted final AnnotationModel annotationModel,
+      final JavaReconcileClient client,
+      final SemanticHighlightRenderer highlighter,
+      final ResolvingProjectStateHolderRegistry resolvingProjectStateHolderRegistry,
+      final JavaLocalizationConstant localizationConstant,
+      final EventBus eventBus) {
+    this.editor = editor;
+    this.client = client;
+    this.codeAssistProcessor = codeAssistProcessor;
+    this.annotationModel = annotationModel;
+    this.highlighter = highlighter;
+    this.resolvingProjectStateHolderRegistry = resolvingProjectStateHolderRegistry;
+    this.localizationConstant = localizationConstant;
+    this.eventBus = eventBus;
+    if (editor instanceof EditorWithErrors) {
+      this.editorWithErrors = ((EditorWithErrors) editor);
     }
 
-    @Override
-    public void setDocument(final Document document) {
-        file = editor.getEditorInput().getFile();
-        highlighter.init(editor.getHasTextMarkers(), document);
+    HandlerRegistration reconcileOperationHandlerRegistration =
+        eventBus.addHandler(ReconcileOperationEvent.TYPE, this);
+    handlerRegistrations.add(reconcileOperationHandlerRegistration);
+
+    HandlerRegistration classpathChangedHandlerRegistration =
+        eventBus.addHandler(ClasspathChangedEvent.TYPE, this);
+    handlerRegistrations.add(classpathChangedHandlerRegistration);
+  }
+
+  @Override
+  public void setDocument(final Document document) {
+    highlighter.init(editor.getEditorWidget(), document);
+
+    VirtualFile file = getFile();
+    Project project = getProject(file);
+    if (project == null) {
+      return;
     }
 
-    @Override
-    public void reconcile(final DirtyRegion dirtyRegion, final Region subRegion) {
-        parse();
+    String projectType = project.getType();
+    resolvingProjectStateHolder =
+        resolvingProjectStateHolderRegistry.getResolvingProjectStateHolder(projectType);
+    if (resolvingProjectStateHolder == null) {
+      return;
+    }
+    resolvingProjectStateHolder.addResolvingProjectStateListener(this);
+
+    if (isProjectResolving()) {
+      disableReconciler(localizationConstant.codeAssistErrorMessageResolvingProject());
+    }
+  }
+
+  @Override
+  public void reconcile(final DirtyRegion dirtyRegion, final Region subRegion) {
+    parse();
+  }
+
+  void parse() {
+    VirtualFile file = getFile();
+    Project project = getProject(file);
+    if (project == null) {
+      return;
     }
 
-    public void parse() {
-        if (first) {
-            codeAssistProcessor.disableCodeAssistant();
-            first = false;
+    String fqn = resolveFQN(file);
+    String projectPath = project.getPath();
+
+    client
+        .reconcile(fqn, projectPath)
+        .onSuccess(
+            reconcileResult -> {
+              if (isProjectResolving()) {
+                disableReconciler(localizationConstant.codeAssistErrorMessageResolvingProject());
+                return;
+              } else {
+                codeAssistProcessor.enableCodeAssistant();
+              }
+
+              if (reconcileResult == null) {
+                return;
+              }
+
+              doReconcile(reconcileResult.getProblems());
+              highlighter.reconcile(reconcileResult.getHighlightedPositions());
+              eventBus.fireEvent(new JavaReconsilerEvent(editor));
+            })
+        .onFailure(jsonRpcError -> Log.info(getClass(), jsonRpcError.getMessage()));
+  }
+
+  @Override
+  public void reconcile(final Region partition) {
+    parse();
+  }
+
+  private VirtualFile getFile() {
+    return editor.getEditorInput().getFile();
+  }
+
+  private Project getProject(VirtualFile file) {
+    if (file == null || !(file instanceof Resource)) {
+      return null;
+    }
+
+    Project project = ((Resource) file).getProject();
+    return (project != null && project.exists()) ? project : null;
+  }
+
+  private void doReconcile(final List<Problem> problems) {
+    if (this.annotationModel == null) {
+      return;
+    }
+    ProblemRequester problemRequester;
+    if (this.annotationModel instanceof ProblemRequester) {
+      problemRequester = (ProblemRequester) this.annotationModel;
+      problemRequester.beginReporting();
+    } else {
+      if (editorWithErrors != null) {
+        editorWithErrors.setErrorState(EditorWithErrors.EditorState.NONE);
+      }
+      return;
+    }
+    try {
+      boolean error = false;
+      boolean warning = false;
+      for (Problem problem : problems) {
+
+        if (!error) {
+          error = problem.isError();
         }
-
-
-        String fqn = JavaSourceFolderUtil.getFQNForFile(file);
-        client.reconcile(file.getProject().getProjectConfig().getPath(), fqn, new JavaReconcileClient.ReconcileCallback() {
-            @Override
-            public void onReconcile(ReconcileResult result) {
-                if (result == null) {
-                    return;
-                }
-                doReconcile(result.getProblems());
-                highlighter.reconcile(result.getHighlightedPositions());
-            }
-        });
-    }
-
-
-    @Override
-    public void reconcile(final Region partition) {
-        parse();
-    }
-
-    public VirtualFile getFile() {
-        return file;
-    }
-
-    private void doReconcile(final List<Problem> problems) {
-        if (!first) {
-            codeAssistProcessor.enableCodeAssistant();
+        if (!warning) {
+          warning = problem.isWarning();
         }
-
-        if (this.annotationModel == null) {
-            return;
-        }
-        ProblemRequester problemRequester;
-        if (this.annotationModel instanceof ProblemRequester) {
-            problemRequester = (ProblemRequester)this.annotationModel;
-            problemRequester.beginReporting();
+        problemRequester.acceptProblem(problem);
+      }
+      if (editorWithErrors != null) {
+        if (error) {
+          editorWithErrors.setErrorState(EditorWithErrors.EditorState.ERROR);
+        } else if (warning) {
+          editorWithErrors.setErrorState(EditorWithErrors.EditorState.WARNING);
         } else {
-            editor.setErrorState(EditorWithErrors.EditorState.NONE);
-            return;
+          editorWithErrors.setErrorState(EditorWithErrors.EditorState.NONE);
         }
-        try {
-            boolean error = false;
-            boolean warning = false;
-            for (Problem problem : problems) {
+      }
+    } catch (final Exception e) {
+      Log.error(getClass(), e);
+    } finally {
+      problemRequester.endReporting();
+    }
+  }
 
-                if (!error) {
-                    error = problem.isError();
-                }
-                if (!warning) {
-                    warning = problem.isWarning();
-                }
-                problemRequester.acceptProblem(problem);
-            }
-            if (error) {
-                editor.setErrorState(EditorWithErrors.EditorState.ERROR);
-            } else if (warning) {
-                editor.setErrorState(EditorWithErrors.EditorState.WARNING);
-            } else {
-                editor.setErrorState(EditorWithErrors.EditorState.NONE);
-            }
-        } catch (final Exception e) {
-            Log.error(getClass(), e);
-        } finally {
-            problemRequester.endReporting();
-        }
+  private void disableReconciler(String errorMessage) {
+    codeAssistProcessor.disableCodeAssistant(errorMessage);
+    doReconcile(Collections.<Problem>emptyList());
+    highlighter.reconcile(Collections.<HighlightedPosition>emptyList());
+  }
+
+  @Override
+  public void closeReconciler() {
+    if (resolvingProjectStateHolder != null) {
+      resolvingProjectStateHolder.removeResolvingProjectStateListener(this);
+    }
+    handlerRegistrations.forEach(HandlerRegistration::removeHandler);
+  }
+
+  @Override
+  public void onResolvingProjectStateChanged(ResolvingProjectState state) {
+    switch (state) {
+      case IN_PROGRESS:
+        disableReconciler(localizationConstant.codeAssistErrorMessageResolvingProject());
+        break;
+      case RESOLVED:
+        parse();
+        break;
+      default:
+        break;
+    }
+  }
+
+  private boolean isProjectResolving() {
+    return resolvingProjectStateHolder != null
+        && resolvingProjectStateHolder.getState() == IN_PROGRESS;
+  }
+
+  @Override
+  public void onReconcileOperation(ReconcileResult reconcileResult) {
+    String currentEditorPath = editor.getEditorInput().getFile().getLocation().toString();
+    if (!currentEditorPath.equals(reconcileResult.getFileLocation())) {
+      return;
     }
 
-    @Override
-    public void closeReconciler() {
-        if (handlerRegistration != null) {
-            handlerRegistration.removeHandler();
-        }
+    if (isProjectResolving()) {
+      disableReconciler(localizationConstant.codeAssistErrorMessageResolvingProject());
+      return;
+    } else {
+      codeAssistProcessor.enableCodeAssistant();
     }
+
+    doReconcile(reconcileResult.getProblems());
+    highlighter.reconcile(reconcileResult.getHighlightedPositions());
+  }
+
+  @Override
+  public void onClasspathChanged(ClasspathChangedEvent event) {
+    VirtualFile file = getFile();
+    Project project = getProject(file);
+    if (project == null) {
+      return;
+    }
+
+    String projectPath = project.getPath();
+    if (projectPath.equals(event.getPath())) {
+      parse();
+    }
+  }
 }

@@ -1,18 +1,18 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.project.shared.dto;
 
-import org.eclipse.che.dto.shared.DTO;
-
 import java.util.List;
+import org.eclipse.che.dto.shared.DTO;
 
 /**
  * Data transfer object (DTO) for org.eclipse.che.api.project.shared.AttributeDescription
@@ -21,34 +21,33 @@ import java.util.List;
  */
 @DTO
 public interface AttributeDescriptor {
-    String getName();
+  String getName();
 
-    void setName(String name);
+  void setName(String name);
 
-    AttributeDescriptor withName(String name);
+  AttributeDescriptor withName(String name);
 
-    String getDescription();
+  String getDescription();
 
-    void setDescription(String description);
+  void setDescription(String description);
 
-    AttributeDescriptor withDescription(String description);
+  AttributeDescriptor withDescription(String description);
 
-    boolean getRequired();
+  boolean getRequired();
 
-    void setRequired(boolean required);
+  void setRequired(boolean required);
 
-    AttributeDescriptor withRequired(boolean required);
+  AttributeDescriptor withRequired(boolean required);
 
-    boolean getVariable();
+  boolean getVariable();
 
-    void setVariable(boolean variable);
+  void setVariable(boolean variable);
 
-    AttributeDescriptor withVariable(boolean variable);
+  AttributeDescriptor withVariable(boolean variable);
 
-    List<String> getValues();
+  List<String> getValues();
 
-    void setValues(List<String> values);
+  void setValues(List<String> values);
 
-    AttributeDescriptor withValues(List<String> values);
-
+  AttributeDescriptor withValues(List<String> values);
 }

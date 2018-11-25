@@ -1,343 +1,154 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.git.client.add;
 
-import com.google.gwt.safehtml.shared.SafeHtml;
-import com.googlecode.gwt.test.utils.GwtReflectionUtils;
-
-import org.eclipse.che.api.git.shared.Status;
-import org.eclipse.che.ide.api.project.node.HasStorablePath;
-import org.eclipse.che.ide.api.selection.Selection;
-import org.eclipse.che.ide.ext.git.client.BaseTest;
-import org.eclipse.che.ide.part.explorer.project.ProjectExplorerPresenter;
-import org.eclipse.che.ide.project.node.FileReferenceNode;
-import org.eclipse.che.ide.project.node.FolderReferenceNode;
-import org.eclipse.che.ide.project.node.ProjectNode;
-import org.eclipse.che.ide.rest.AsyncRequestCallback;
-import org.eclipse.che.ide.websocket.WebSocketException;
-import org.eclipse.che.ide.websocket.rest.RequestCallback;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
-import org.mockito.Matchers;
-import org.mockito.Mock;
-
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.eclipse.che.ide.api.notification.StatusNotification.DisplayMode.FLOAT_MODE;
-import static org.eclipse.che.ide.ext.git.client.add.AddToIndexPresenter.ADD_TO_INDEX_COMMAND_NAME;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.doThrow;
+import static org.eclipse.che.ide.api.notification.StatusNotification.Status.FAIL;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import org.eclipse.che.api.promises.client.Operation;
+import org.eclipse.che.ide.api.resources.Container;
+import org.eclipse.che.ide.api.resources.File;
+import org.eclipse.che.ide.api.resources.Project;
+import org.eclipse.che.ide.api.resources.Resource;
+import org.eclipse.che.ide.ext.git.client.BaseTest;
+import org.eclipse.che.ide.ext.git.client.outputconsole.GitOutputConsole;
+import org.eclipse.che.ide.resource.Path;
+import org.junit.Test;
+import org.mockito.Mock;
 
 /**
  * Testing {@link AddToIndexPresenter} functionality.
  *
  * @author Andrey Plotnikov
+ * @author Vlad Zhukovskyi
+ * @author Igor Vinokur
  */
 public class AddToIndexPresenterTest extends BaseTest {
-    public static final boolean  NEED_UPDATING = true;
-    public static final SafeHtml SAFE_HTML     = mock(SafeHtml.class);
-    public static final String   MESSAGE       = "message";
+  private static final String MESSAGE = "message";
+  private static final String FOLDER_NAME = "folder name";
+  private static final String FILE_NAME = "file name";
 
-    @Captor
-    private ArgumentCaptor<RequestCallback<Void>>        requestCallbackAddToIndexCaptor;
-    @Captor
-    private ArgumentCaptor<AsyncRequestCallback<Status>> asyncRequestCallbackStatusCaptor;
+  @Mock private AddToIndexView view;
+  @Mock private GitOutputConsole console;
 
-    @Mock
-    private AddToIndexView           view;
-    @Mock
-    private ProjectExplorerPresenter projectExplorer;
-    @Mock
-    private Status                   statusResponse;
+  private AddToIndexPresenter presenter;
 
-    private AddToIndexPresenter presenter;
+  @Override
+  public void disarm() {
+    super.disarm();
 
-    @Override
-    public void disarm() {
-        super.disarm();
-        presenter = new AddToIndexPresenter(view,
-                                            appContext,
-                                            dtoUnmarshallerFactory,
-                                            constant,
-                                            gitOutputConsoleFactory,
-                                            consolesPanelPresenter,
-                                            service,
-                                            notificationManager,
-                                            projectExplorer);
-    }
+    presenter =
+        new AddToIndexPresenter(
+            view,
+            appContext,
+            constant,
+            gitOutputConsoleFactory,
+            processesPanelPresenter,
+            service,
+            notificationManager);
 
-    @Test
-    public void testDialogWillNotBeShownWhenStatusRequestIsFailed() throws Exception {
-        presenter.showDialog();
+    when(appContext.getResources()).thenReturn(new Resource[] {});
+    when(appContext.getRootProject()).thenReturn(mock(Project.class));
+    when(voidPromise.then(any(Operation.class))).thenReturn(voidPromise);
+    when(voidPromise.catchError(any(Operation.class))).thenReturn(voidPromise);
+    when(service.add(any(Path.class), anyBoolean(), any(Path[].class))).thenReturn(voidPromise);
+    when(gitOutputConsoleFactory.create(anyString())).thenReturn(console);
+  }
 
-        verify(service).status(eq(devMachine), eq(rootProjectConfig), asyncRequestCallbackStatusCaptor.capture());
-        AsyncRequestCallback<Status> callback = asyncRequestCallbackStatusCaptor.getValue();
+  @Test
+  public void shouldSetFolderMessageToViewAndShowDialog() throws Exception {
+    Container folder = mock(Container.class);
+    when(folder.getName()).thenReturn(FOLDER_NAME);
+    when(appContext.getResource()).thenReturn(folder);
+    when(appContext.getResources()).thenReturn(new Resource[] {folder});
+    when(constant.addToIndexFolder(FOLDER_NAME)).thenReturn(MESSAGE);
 
-        //noinspection NonJREEmulationClassesInClientCode
-        Method onFailure = GwtReflectionUtils.getMethod(callback.getClass(), "onFailure");
-        onFailure.invoke(callback, mock(Throwable.class));
+    presenter.showDialog();
 
-        verify(gitOutputConsoleFactory).create(ADD_TO_INDEX_COMMAND_NAME);
-        verify(console).printError(anyString());
-        verify(consolesPanelPresenter).addCommandOutput(anyString(), eq(console));
-        verify(notificationManager).notify(anyString(), anyObject(), eq(FLOAT_MODE), eq(rootProjectConfig));
-        verify(view, never()).showDialog();
-        verify(constant, times(2)).statusFailed();
-    }
+    verify(constant).addToIndexFolder(eq(FOLDER_NAME));
+    verify(view).setMessage(eq(MESSAGE));
+    verify(view).setUpdated(eq(false));
+    verify(view).showDialog();
+  }
 
-    @Test
-    public void testDialogWillNotBeShownWhenNothingAddToIndex() throws Exception {
-        when(this.statusResponse.isClean()).thenReturn(true);
+  @Test
+  public void shouldSetFileMessageToViewAndShowDialog() throws Exception {
+    File file = mock(File.class);
+    when(file.getName()).thenReturn(FILE_NAME);
+    when(appContext.getResource()).thenReturn(file);
+    when(appContext.getResources()).thenReturn(new Resource[] {file});
+    when(constant.addToIndexFile(FILE_NAME)).thenReturn(MESSAGE);
 
-        presenter.showDialog();
+    presenter.showDialog();
 
-        verify(service).status(eq(devMachine), eq(rootProjectConfig), asyncRequestCallbackStatusCaptor.capture());
-        AsyncRequestCallback<Status> callback = asyncRequestCallbackStatusCaptor.getValue();
+    verify(constant).addToIndexFile(eq(FILE_NAME));
+    verify(view).setMessage(eq(MESSAGE));
+    verify(view).setUpdated(eq(false));
+    verify(view).showDialog();
+  }
 
-        //noinspection NonJREEmulationClassesInClientCode
-        Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-        onSuccess.invoke(callback, this.statusResponse);
+  @Test
+  public void shouldSetMultiSelectionMessageToViewAndShowDialog() throws Exception {
+    File file1 = mock(File.class);
+    File file2 = mock(File.class);
+    when(file1.getName()).thenReturn(FILE_NAME + "1");
+    when(file2.getName()).thenReturn(FILE_NAME + "2");
+    when(appContext.getResource()).thenReturn(file2);
+    when(appContext.getResources()).thenReturn(new Resource[] {file1, file2});
+    when(constant.addToIndexMultiSelect()).thenReturn(MESSAGE);
 
-        verify(gitOutputConsoleFactory).create(ADD_TO_INDEX_COMMAND_NAME);
-        verify(console).print(anyString());
-        verify(consolesPanelPresenter).addCommandOutput(anyString(), eq(console));
-        verify(notificationManager).notify(anyString(), eq(rootProjectConfig));
-        verify(view, never()).showDialog();
-        verify(constant, times(2)).nothingAddToIndex();
-    }
+    presenter.showDialog();
 
-    @Test
-    public void testShowDialogWhenRootFolderIsSelected() throws Exception {
-        Selection selection = mock(Selection.class);
-        ProjectNode project = mock(ProjectNode.class);
-        when(project.getStorablePath()).thenReturn(PROJECT_PATH);
-        when(selection.getHeadElement()).thenReturn(project);
-        when(selection.isEmpty()).thenReturn(false);
-        when(selection.isSingleSelection()).thenReturn(true);
-        when(projectExplorer.getSelection()).thenReturn(selection);
-        when(constant.addToIndexAllChanges()).thenReturn(MESSAGE);
-        when(this.statusResponse.isClean()).thenReturn(false);
+    verify(constant).addToIndexMultiSelect();
+    verify(view).setMessage(eq(MESSAGE));
+    verify(view).setUpdated(eq(false));
+    verify(view).showDialog();
+  }
 
-        presenter.showDialog();
+  @Test
+  public void shouldAddToIndexWhenAddButtonClicked() throws Exception {
+    when(constant.addSuccess()).thenReturn(MESSAGE);
 
-        verify(service).status(eq(devMachine), eq(rootProjectConfig), asyncRequestCallbackStatusCaptor.capture());
-        AsyncRequestCallback<Status> callback = asyncRequestCallbackStatusCaptor.getValue();
+    presenter.onAddClicked();
+    verify(voidPromise).then(voidPromiseCaptor.capture());
+    voidPromiseCaptor.getValue().apply(null);
 
-        //noinspection NonJREEmulationClassesInClientCode
-        Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-        onSuccess.invoke(callback, this.statusResponse);
+    verify(console).print(eq(MESSAGE));
+    verify(notificationManager).notify(MESSAGE);
+  }
 
-        verify(appContext).getCurrentProject();
-        verify(constant).addToIndexAllChanges();
-        verify(view).setMessage(eq(MESSAGE), Matchers.<List<String>>eq(null));
-        verify(view).setUpdated(anyBoolean());
-        verify(view).showDialog();
-    }
+  @Test
+  public void shouldPrintErrorWhenFailedAddToIndex() throws Exception {
+    when(constant.addFailed()).thenReturn(MESSAGE);
 
-    @Test
-    public void testShowDialogWhenSomeFolderIsSelected() throws Exception {
-        String folderPath = PROJECT_PATH + PROJECT_NAME;
-        Selection selection = mock(Selection.class);
-        FolderReferenceNode folder = mock(FolderReferenceNode.class);
-        when(folder.getStorablePath()).thenReturn(folderPath);
-        when(selection.getHeadElement()).thenReturn(folder);
-        when(selection.isEmpty()).thenReturn(false);
-        when(selection.isSingleSelection()).thenReturn(true);
-        when(projectExplorer.getSelection()).thenReturn(selection);
-        when(constant.addToIndexFolder(anyString())).thenReturn(SAFE_HTML);
-        when(this.statusResponse.isClean()).thenReturn(false);
+    presenter.onAddClicked();
+    verify(voidPromise).catchError(promiseErrorCaptor.capture());
+    promiseErrorCaptor.getValue().apply(null);
 
-        presenter.showDialog();
+    verify(console).printError(eq(MESSAGE));
+    verify(notificationManager).notify(eq(MESSAGE), eq(FAIL), eq(FLOAT_MODE));
+  }
 
-        verify(service).status(eq(devMachine), eq(rootProjectConfig), asyncRequestCallbackStatusCaptor.capture());
-        AsyncRequestCallback<Status> callback = asyncRequestCallbackStatusCaptor.getValue();
+  @Test
+  public void testOnCancelClicked() throws Exception {
+    presenter.onCancelClicked();
 
-        //noinspection NonJREEmulationClassesInClientCode
-        Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-        onSuccess.invoke(callback, this.statusResponse);
-
-        verify(appContext).getCurrentProject();
-        verify(constant).addToIndexFolder(eq(PROJECT_NAME));
-        verify(view).setUpdated(anyBoolean());
-        verify(view).showDialog();
-    }
-
-    @Test
-    public void testShowDialogWhenSomeFileIsSelected() throws Exception {
-        String filePath = PROJECT_PATH + PROJECT_NAME;
-        Selection selection = mock(Selection.class);
-        FileReferenceNode file = mock(FileReferenceNode.class);
-        when(file.getPath()).thenReturn(filePath);
-        when(selection.getHeadElement()).thenReturn(file);
-        when(selection.isEmpty()).thenReturn(false);
-        when(selection.isSingleSelection()).thenReturn(true);
-        when(file.getStorablePath()).thenReturn(filePath);
-        when(selection.getHeadElement()).thenReturn(file);
-        when(projectExplorer.getSelection()).thenReturn(selection);
-        when(constant.addToIndexFile(anyString())).thenReturn(SAFE_HTML);
-        when(SAFE_HTML.asString()).thenReturn(MESSAGE);
-        when(this.statusResponse.isClean()).thenReturn(false);
-
-        presenter.showDialog();
-
-        verify(service).status(eq(devMachine), eq(rootProjectConfig), asyncRequestCallbackStatusCaptor.capture());
-        AsyncRequestCallback<Status> callback = asyncRequestCallbackStatusCaptor.getValue();
-
-        //noinspection NonJREEmulationClassesInClientCode
-        Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-        onSuccess.invoke(callback, this.statusResponse);
-
-        verify(appContext).getCurrentProject();
-        verify(constant).addToIndexFile(eq(PROJECT_NAME));
-        verify(view).setMessage(eq(MESSAGE), Matchers.<List<String>>eq(null));
-        verify(view).setUpdated(anyBoolean());
-        verify(view).showDialog();
-    }
-
-    @Test
-    public void testShowDialogTwoFileAreSelected() throws Exception {
-        final Selection selection = mock(Selection.class);
-        // first file
-        final String filePath = PROJECT_PATH + PROJECT_NAME;
-        final FileReferenceNode file1 = mock(FileReferenceNode.class);
-        when(file1.getPath()).thenReturn(filePath);
-        when(file1.getStorablePath()).thenReturn(filePath);
-
-        //second file
-        final String file2Path = PROJECT_PATH + "test2";
-        final FileReferenceNode file2 = mock(FileReferenceNode.class);
-        when(file2.getPath()).thenReturn(file2Path);
-        when(file2.getStorablePath()).thenReturn(file2Path);
-
-        final List<HasStorablePath> files = new ArrayList<HasStorablePath>() {{
-            add(file1);
-            add(file2);
-        }};
-        when(selection.getAllElements()).thenReturn(files);
-        when(selection.getHeadElement()).thenReturn(file1);
-        when(selection.isEmpty()).thenReturn(false);
-        when(selection.isSingleSelection()).thenReturn(false);
-
-        when(projectExplorer.getSelection()).thenReturn(selection);
-        when(constant.addToIndexMultiple()).thenReturn(MESSAGE);
-        when(this.statusResponse.isClean()).thenReturn(false);
-
-        presenter.showDialog();
-
-        verify(service).status(eq(devMachine), eq(rootProjectConfig), asyncRequestCallbackStatusCaptor.capture());
-        final AsyncRequestCallback<Status> callback = asyncRequestCallbackStatusCaptor.getValue();
-
-        //noinspection NonJREEmulationClassesInClientCode
-        final Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-        onSuccess.invoke(callback, this.statusResponse);
-
-        verify(appContext).getCurrentProject();
-        verify(constant).addToIndexMultiple();
-        verify(view).setMessage(eq(MESSAGE), Matchers.<List<String>>anyObject());
-        verify(view).setUpdated(anyBoolean());
-        verify(view).showDialog();
-    }
-
-    @Test
-    public void testOnAddClickedWhenAddWSRequestIsSuccessful() throws Exception {
-        reset(gitOutputConsoleFactory);
-        when(gitOutputConsoleFactory.create(anyString())).thenReturn(console);
-        when(view.isUpdated()).thenReturn(NEED_UPDATING);
-        when(constant.addSuccess()).thenReturn(MESSAGE);
-
-        presenter.showDialog();
-        presenter.onAddClicked();
-
-        verify(service)
-                .add(eq(devMachine), eq(rootProjectConfig), eq(NEED_UPDATING), (List<String>)anyObject(), requestCallbackAddToIndexCaptor.capture());
-        RequestCallback<Void> callback = requestCallbackAddToIndexCaptor.getValue();
-
-        //noinspection NonJREEmulationClassesInClientCode
-        Method onSuccess = GwtReflectionUtils.getMethod(callback.getClass(), "onSuccess");
-        onSuccess.invoke(callback, (Void)null);
-
-        verify(view).isUpdated();
-        verify(view).close();
-        verify(service).add(eq(devMachine), eq(rootProjectConfig), eq(NEED_UPDATING), (List<String>)anyObject(),
-                            (RequestCallback<Void>)anyObject());
-        verify(gitOutputConsoleFactory, times(2)).create(ADD_TO_INDEX_COMMAND_NAME);
-        verify(console).print(anyString());
-        verify(consolesPanelPresenter).addCommandOutput(anyString(), eq(console));
-        verify(notificationManager).notify(anyString(), eq(rootProjectConfig));
-        verify(constant, times(2)).addSuccess();
-    }
-
-    @Test
-    public void testOnAddClickedWhenAddWSRequestIsFailed() throws Exception {
-        reset(gitOutputConsoleFactory);
-        when(gitOutputConsoleFactory.create(anyString())).thenReturn(console);
-        when(view.isUpdated()).thenReturn(NEED_UPDATING);
-
-        presenter.showDialog();
-        presenter.onAddClicked();
-
-        verify(service)
-                .add(eq(devMachine), eq(rootProjectConfig), eq(NEED_UPDATING), (List<String>)anyObject(), requestCallbackAddToIndexCaptor.capture());
-        RequestCallback<Void> callback = requestCallbackAddToIndexCaptor.getValue();
-
-        //noinspection NonJREEmulationClassesInClientCode
-        Method onFailure = GwtReflectionUtils.getMethod(callback.getClass(), "onFailure");
-        onFailure.invoke(callback, mock(Throwable.class));
-
-        verify(view).isUpdated();
-        verify(view).close();
-        verify(gitOutputConsoleFactory, times(2)).create(ADD_TO_INDEX_COMMAND_NAME);
-        verify(console).printError(anyString());
-        verify(consolesPanelPresenter).addCommandOutput(anyString(), eq(console));
-        verify(notificationManager).notify(anyString(), anyObject(), eq(FLOAT_MODE), eq(rootProjectConfig));
-        verify(constant, times(2)).addFailed();
-    }
-
-    @Test
-    public void testOnAddClickedWhenAddRequestIsFailed() throws Exception {
-        reset(gitOutputConsoleFactory);
-        when(gitOutputConsoleFactory.create(anyString())).thenReturn(console);
-        doThrow(WebSocketException.class).when(service)
-                                         .add(devMachine, anyObject(), anyBoolean(), anyObject(), anyObject());
-        when(view.isUpdated()).thenReturn(NEED_UPDATING);
-
-        presenter.showDialog();
-        presenter.onAddClicked();
-
-        verify(view).isUpdated();
-        verify(service).add(eq(devMachine), eq(rootProjectConfig), eq(NEED_UPDATING), anyObject(), anyObject());
-        verify(view).close();
-        verify(gitOutputConsoleFactory, times(2)).create(ADD_TO_INDEX_COMMAND_NAME);
-        verify(console).printError(anyString());
-        verify(consolesPanelPresenter).addCommandOutput(anyString(), eq(console));
-        verify(notificationManager).notify(anyString(), anyObject(), eq(FLOAT_MODE), eq(rootProjectConfig));
-        verify(constant, times(2)).addFailed();
-    }
-
-    @Test
-    public void testOnCancelClicked() throws Exception {
-        presenter.onCancelClicked();
-
-        verify(view).close();
-    }
+    verify(view).close();
+  }
 }

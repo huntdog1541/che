@@ -1,12 +1,13 @@
 /*******************************************************************************
- * Copyright (c) 2015-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * Copyright (c) 2015-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
+ *   Red Hat, Inc. - initial API and implementation
  *******************************************************************************/
 
 'use strict';
@@ -22,10 +23,11 @@ var $ = require('gulp-load-plugins')();
 
 function webpackWrapper(watch, test, callback) {
   var webpackOptions = {
+    resolve: { extensions: ['', '.ts'] },
     watch: watch,
     module: {
-      preLoaders: [{ test: /\.js$/, exclude: /node_modules/, loader: 'eslint-loader'}],
-      loaders: [{ test: /\.js$/, exclude: /node_modules/, loaders: ['ng-annotate', 'babel-loader']}]
+      preLoaders: [{ test: /\.ts$/, exclude: /node_modules/, loader: 'tslint-loader'}],
+      loaders: [{ test: /\.ts$/, exclude: /node_modules/, loaders: ['babel-loader', 'awesome-typescript-loader']}]
     },
     output: { filename: 'index.module.js' }
   };
@@ -51,9 +53,9 @@ function webpackWrapper(watch, test, callback) {
     }
   };
 
-  var sources = [ path.join(conf.paths.src, '/app/index.module.js') ];
+  var sources = [ path.join(conf.paths.src, '/app/index.module.ts') ];
   if (test) {
-    sources.push(path.join(conf.paths.src, '/{app,components}/**/*.spec.js'));
+    sources.push(path.join(conf.paths.src, '/{app,components}/**/*.spec.ts'));
   }
 
   return gulp.src(sources)

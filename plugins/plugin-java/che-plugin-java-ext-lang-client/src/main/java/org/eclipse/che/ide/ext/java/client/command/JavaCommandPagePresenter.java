@@ -1,112 +1,141 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.java.client.command;
 
+import com.google.common.base.Optional;
 import com.google.gwt.user.client.ui.AcceptsOneWidget;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-
-import org.eclipse.che.ide.api.app.AppContext;
+import org.eclipse.che.ide.api.command.CommandImpl;
+import org.eclipse.che.ide.api.command.CommandPage;
+import org.eclipse.che.ide.api.resources.Project;
+import org.eclipse.che.ide.api.resources.Resource;
 import org.eclipse.che.ide.ext.java.client.command.mainclass.SelectNodePresenter;
-import org.eclipse.che.ide.extension.machine.client.command.CommandConfigurationPage;
-
-import javax.validation.constraints.NotNull;
+import org.eclipse.che.ide.resource.Path;
 
 /**
- * Page allows to configure Java command parameters.
+ * Page allows to customize command of {@link JavaCommandType}.
  *
  * @author Valeriy Svydenko
+ * @author Artem Zatsarynnyi
  */
 @Singleton
-public class JavaCommandPagePresenter implements JavaCommandPageView.ActionDelegate, CommandConfigurationPage<JavaCommandConfiguration> {
-    private final JavaCommandPageView view;
-    private final SelectNodePresenter selectNodePresenter;
-    private final AppContext appContext;
+public class JavaCommandPagePresenter implements JavaCommandPageView.ActionDelegate, CommandPage {
 
-    private JavaCommandConfiguration editedConfiguration;
-    private String                   originCommandLine;
-    private String                   originMainClass;
-    private DirtyStateListener       listener;
-    private FieldStateActionDelegate delegate;
+  private final JavaCommandPageView view;
+  private final SelectNodePresenter selectNodePresenter;
 
-    @Inject
-    public JavaCommandPagePresenter(JavaCommandPageView view,
-                                    SelectNodePresenter selectNodePresenter,
-                                    AppContext appContext) {
-        this.view = view;
-        this.selectNodePresenter = selectNodePresenter;
-        this.appContext = appContext;
-        view.setDelegate(this);
+  private CommandImpl editedCommand;
+  private JavaCommandModel editedCommandModel;
+
+  // initial value of the 'Main class' parameter
+  private String mainClassInitial;
+  // initial value of the command line
+  private String commandLineInitial;
+
+  private DirtyStateListener listener;
+  private FieldStateActionDelegate delegate;
+
+  @Inject
+  public JavaCommandPagePresenter(
+      JavaCommandPageView view, SelectNodePresenter selectNodePresenter) {
+    this.view = view;
+    this.selectNodePresenter = selectNodePresenter;
+    view.setDelegate(this);
+  }
+
+  @Override
+  public void resetFrom(CommandImpl command) {
+    editedCommand = command;
+
+    editedCommandModel = JavaCommandModel.fromCommandLine(command.getCommandLine());
+
+    mainClassInitial = editedCommandModel.getMainClass();
+    commandLineInitial = editedCommandModel.getCommandLine();
+  }
+
+  @Override
+  public void go(AcceptsOneWidget container) {
+    container.setWidget(view);
+
+    view.setMainClass(editedCommandModel.getMainClass());
+    view.setCommandLine(editedCommandModel.getCommandLine());
+
+    delegate.updatePreviewURLState(false);
+  }
+
+  @Override
+  public void onSave() {
+    mainClassInitial = editedCommandModel.getMainClass();
+    commandLineInitial = editedCommandModel.getCommandLine();
+  }
+
+  @Override
+  public boolean isDirty() {
+    return !commandLineInitial.equals(editedCommandModel.getCommandLine())
+        || !mainClassInitial.equals(editedCommandModel.getMainClass());
+  }
+
+  @Override
+  public void setDirtyStateListener(DirtyStateListener listener) {
+    this.listener = listener;
+  }
+
+  @Override
+  public void setFieldStateActionDelegate(FieldStateActionDelegate delegate) {
+    this.delegate = delegate;
+  }
+
+  @Override
+  public void onAddMainClassBtnClicked() {
+    selectNodePresenter.show(this);
+  }
+
+  @Override
+  public void onCommandLineChanged() {
+    editedCommandModel.setCommandLine(view.getCommandLine());
+
+    editedCommand.setCommandLine(editedCommandModel.toCommandLine());
+    listener.onDirtyStateChanged();
+  }
+
+  public void setMainClass(Resource resource, String fqn) {
+    if (editedCommandModel.getMainClass().equals(resource.getLocation().toString())) {
+      return;
     }
 
-    @Override
-    public void resetFrom(JavaCommandConfiguration configuration) {
-        editedConfiguration = configuration;
-        originCommandLine = configuration.getCommandLine();
-        originMainClass = configuration.getMainClass();
+    final Optional<Project> project = resource.getRelatedProject();
+
+    if (!project.isPresent()) {
+      return;
     }
 
-    @Override
-    public void go(AcceptsOneWidget container) {
-        container.setWidget(view);
+    final Path relPath =
+        resource.getLocation().removeFirstSegments(project.get().getLocation().segmentCount());
 
-        view.setMainClass(editedConfiguration.getMainClass());
-        view.setCommandLine(editedConfiguration.getCommandLine());
+    view.setMainClass(relPath.toString());
 
-        delegate.updatePreviewURLState(false);
-    }
+    String commandLine = editedCommandModel.getCommandLine();
+    commandLine = commandLine.replace(editedCommandModel.getMainClass(), relPath.toString());
+    commandLine = commandLine.replace(' ' + editedCommandModel.getMainClassFQN(), ' ' + fqn);
 
-    @Override
-    public boolean isDirty() {
-        return !originCommandLine.equals(editedConfiguration.getCommandLine()) ||
-               !originMainClass.equals(editedConfiguration.getMainClass());
-    }
+    editedCommandModel.setMainClass(view.getMainClass());
+    editedCommandModel.setCommandLine(commandLine);
 
-    @Override
-    public void setDirtyStateListener(@NotNull DirtyStateListener listener) {
-        this.listener = listener;
-    }
+    editedCommand.setCommandLine(editedCommandModel.toCommandLine());
+    listener.onDirtyStateChanged();
+  }
 
-    @Override
-    public void setFieldStateActionDelegate(FieldStateActionDelegate delegate) {
-        this.delegate = delegate;
-    }
-
-    @Override
-    public void onAddMainClassBtnClicked() {
-        selectNodePresenter.show(this);
-    }
-
-    @Override
-    public void onCommandLineChanged() {
-        editedConfiguration.setCommandLine(view.getCommandLine());
-        listener.onDirtyStateChanged();
-    }
-
-    public void setMainClass(String path, String fqn) {
-        if (editedConfiguration.getMainClass().equals(path)) {
-            return;
-        }
-
-        String projectPath = appContext.getCurrentProject().getProjectConfig().getPath();
-        String relativePath = path.substring(path.indexOf(projectPath) + projectPath.length() + 1);
-
-        view.setMainClass(relativePath);
-        editedConfiguration.setCommandLine(editedConfiguration.getCommandLine().replace(editedConfiguration.getMainClass(),relativePath));
-        editedConfiguration.setCommandLine(editedConfiguration.getCommandLine().replace(editedConfiguration.getMainClassFqn(),fqn));
-        editedConfiguration.setMainClass(relativePath);
-        listener.onDirtyStateChanged();
-    }
-
-    public JavaCommandConfiguration getConfiguration() {
-        return editedConfiguration;
-    }
+  public JavaCommandModel getEditedCommandModel() {
+    return editedCommandModel;
+  }
 }

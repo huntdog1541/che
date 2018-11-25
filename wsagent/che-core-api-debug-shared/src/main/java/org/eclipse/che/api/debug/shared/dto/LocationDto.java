@@ -1,30 +1,53 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.debug.shared.dto;
 
 import org.eclipse.che.api.debug.shared.model.Location;
 import org.eclipse.che.dto.shared.DTO;
 
-/** @author andrew00x */
+/** @author Anatolii Bazko */
 @DTO
 public interface LocationDto extends Location {
-    String getTarget();
+  void setTarget(String target);
 
-    void setTarget(String target);
+  LocationDto withTarget(String target);
 
-    LocationDto withTarget(String target);
+  void setLineNumber(int lineNumber);
 
-    int getLineNumber();
+  LocationDto withLineNumber(int lineNumber);
 
-    void setLineNumber(int lineNumber);
+  void setExternalResource(boolean externalResource);
 
-    LocationDto withLineNumber(int lineNumber);
+  LocationDto withExternalResource(boolean externalResource);
+
+  void setExternalResourceId(int externalResourceId);
+
+  LocationDto withExternalResourceId(int externalResourceId);
+
+  void setResourceProjectPath(String resourceProjectPath);
+
+  LocationDto withResourceProjectPath(String resourceProjectPath);
+
+  @Override
+  MethodDto getMethod();
+
+  void setMethod(MethodDto method);
+
+  LocationDto withMethod(MethodDto method);
+
+  @Override
+  long getThreadId();
+
+  void setThreadId(long threadId);
+
+  LocationDto withThreadId(long threadId);
 }

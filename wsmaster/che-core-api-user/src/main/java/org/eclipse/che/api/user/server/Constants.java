@@ -1,40 +1,45 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.user.server;
 
 /**
- * Constants for User API and UserProfile API
+ * Constants for User/Profile/Preferences API.
  *
- * @author Eugene Voevodin
+ * @author Yevhenii Voevodin
  * @author Max Shaposhnik
  */
 public final class Constants {
 
-    public static final String LINK_REL_GET_CURRENT_USER_PROFILE    = "current user profile";
-    public static final String LINK_REL_UPDATE_CURRENT_USER_PROFILE = "update current user profile";
-    public static final String LINK_REL_GET_USER_PROFILE_BY_ID      = "user profile by id";
-    public static final String LINK_REL_UPDATE_USER_PROFILE_BY_ID   = "update user profile by id";
-    public static final String LINK_REL_INROLE                      = "in role";
-    public static final String LINK_REL_CREATE_USER                 = "create user";
-    public static final String LINK_REL_GET_CURRENT_USER            = "get current";
-    public static final String LINK_REL_UPDATE_PASSWORD             = "update password";
-    public static final String LINK_REL_REMOVE_PREFERENCES          = "remove preferences";
-    public static final String LINK_REL_REMOVE_ATTRIBUTES           = "remove attributes";
-    public static final String LINK_REL_GET_USER_BY_ID              = "get user by id";
-    public static final String LINK_REL_GET_USER_BY_EMAIL           = "get user by email";
-    public static final String LINK_REL_REMOVE_USER_BY_ID           = "remove user by id";
-    public static final String LINK_REL_UPDATE_PREFERENCES          = "update prefs";
-    public static final int    ID_LENGTH                            = 16;
-    public static final int    PASSWORD_LENGTH                      = 10;
+  /** Profile link relationships. */
+  public static final String LINK_REL_CURRENT_PROFILE = "current_profile";
 
-    private Constants() {
-    }
+  public static final String LINK_REL_CURRENT_PROFILE_ATTRIBUTES = "current_profile.attributes";
+  public static final String LINK_REL_PROFILE = "profile";
+  public static final String LINK_REL_PROFILE_ATTRIBUTES = "profile.attributes";
+
+  /** User links relationships. */
+  public static final String LINK_REL_USER = "user";
+
+  public static final String LINK_REL_CURRENT_USER = "current_user";
+  public static final String LINK_REL_CURRENT_USER_PASSWORD = "current_user.password";
+  public static final String LINK_REL_CURRENT_USER_SETTINGS = "current_user.settings";
+
+  /** Preferences links relationships. */
+  public static final String LINK_REL_PREFERENCES = "preferences";
+
+  public static final String LINK_REL_SELF = "self";
+
+  public static final int ID_LENGTH = 16;
+  public static final int PASSWORD_LENGTH = 10;
+
+  private Constants() {}
 }

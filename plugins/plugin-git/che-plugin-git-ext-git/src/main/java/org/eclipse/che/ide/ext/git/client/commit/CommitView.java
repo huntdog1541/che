@@ -1,18 +1,21 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.git.client.commit;
 
-import org.eclipse.che.ide.api.mvp.View;
-
+import java.util.List;
 import javax.validation.constraints.NotNull;
+import org.eclipse.che.api.git.shared.Branch;
+import org.eclipse.che.ide.api.mvp.View;
+import org.eclipse.che.ide.ext.git.client.compare.changespanel.ChangesPanelView;
 
 /**
  * The view of {@link CommitPresenter}.
@@ -20,99 +23,93 @@ import javax.validation.constraints.NotNull;
  * @author <a href="mailto:aplotnikov@codenvy.com">Andrey Plotnikov</a>
  */
 public interface CommitView extends View<CommitView.ActionDelegate> {
-    /** Needs for delegate some function into Commit view. */
-    public interface ActionDelegate {
-        /** Performs any actions appropriate in response to the user having pressed the Commit button. */
-        void onCommitClicked();
-
-        /** Performs any actions appropriate in response to the user having pressed the Cancel button. */
-        void onCancelClicked();
-
-        /** Performs any actions appropriate in response to the user having changed something. */
-        void onValueChanged();
-
-        /**
-         * Set the commit message for an amend commit.
-         */
-        void setAmendCommitMessage();
-    }
-
-    /** @return entered message */
-    @NotNull
-    String getMessage();
+  /** Needs for delegate some function into Commit view. */
+  interface ActionDelegate {
+    /**
+     * Performs any actions appropriate in response to the user having pressed the Commit button.
+     */
+    void onCommitClicked();
 
     /**
-     * Set content into message field.
-     *
-     * @param message
-     *         text what need to insert
+     * Performs any actions appropriate in response to the user having pressed the Cancel button.
      */
-    void setMessage(@NotNull String message);
+    void onCancelClicked();
 
-    /** @return <code>true</code> if need to include all changes except from new files, and <code>false</code> otherwise */
-    boolean isAllFilesInclued();
+    /** Performs any actions appropriate in response to the user having changed something. */
+    void onValueChanged();
 
-    /**
-     * Set status of include changes to commit.
-     *
-     * @param isAllFiles
-     *         <code>true</code> need to include all changes except from new, <code>false</code> include all changes
-     */
-    void setAllFilesInclude(boolean isAllFiles);
+    /** Set the commit message for an amend commit. */
+    void setAmendCommitMessage();
+  }
 
-    /**
-     * Returns true if the project explorer selection must be included in the commited files.
-     * 
-     * @return true iff the selection mus tbe commited
-     */
-    boolean isIncludeSelection();
+  /** Returns entered commit message */
+  @NotNull
+  String getCommitMessage();
 
-    /**
-     * Sets the display of the include selection flag.
-     * 
-     * @param includeSelection is selection included
-     */
-    void setIncludeSelection(boolean includeSelection);
+  /** Returns selected remote branch from branches drop-down list. */
+  String getRemoteBranch();
 
-    /**
-     * Tells the state of the field 'commit only selection'.
-     * 
-     * @return true iff the field is checked
-     */
-    boolean isOnlySelection();
+  /**
+   * Set content into message field.
+   *
+   * @param message text what need to insert
+   */
+  void setMessage(@NotNull String message);
 
-    /**
-     * Sets the state of the field 'commit only selection'.
-     * 
-     * @return true to check the field
-     */
-    void setOnlySelection(boolean onlySelection);
+  /** Set list of remote branches to drop-down. */
+  void setRemoteBranchesList(List<Branch> branches);
 
-    /** @return <code>true</code> if need to amend the last commit, and <code>false</code> otherwise */
-    boolean isAmend();
+  /**
+   * Returns <code>true</code> if need to amend the last commit, and <code>false</code> otherwise
+   */
+  boolean isAmend();
 
-    /**
-     * Set status of amend the last commit.
-     *
-     * @param isAmend
-     *         <code>true</code> need to amend the last commit, <code>false</code> need to create new commit
-     */
-    void setAmend(boolean isAmend);
+  /** Set checked or unchecked the 'Amend' checkbox. */
+  void setValueToAmendCheckBox(boolean value);
 
-    /**
-     * Change the enable state of the commit button.
-     *
-     * @param enable
-     *         <code>true</code> to enable the button, <code>false</code> to disable it
-     */
-    void setEnableCommitButton(boolean enable);
+  /** Set checked or unchecked the 'Push after commit' checkbox. */
+  void setValueToPushAfterCommitCheckBox(boolean value);
 
-    /** Give focus to message field. */
-    void focusInMessageField();
+  /**
+   * Change the enable state of the 'Amend' check-box.
+   *
+   * @param enable <code>true</code> to enable the check-box, <code>false</code> to disable it
+   */
+  void setEnableAmendCheckBox(boolean enable);
 
-    /** Close dialog. */
-    void close();
+  /**
+   * Change the enable state of the 'Push after commit' check-box.
+   *
+   * @param enable <code>true</code> to enable the check-box, <code>false</code> to disable it
+   */
+  void setEnablePushAfterCommitCheckBox(boolean enable);
 
-    /** Show dialog. */
-    void showDialog();
+  /**
+   * Change the enable state of the 'Remote branches' drop-down list.
+   *
+   * @param enable <code>true</code> to enable the drop-down list, <code>false</code> to disable it
+   */
+  void setEnableRemoteBranchesDropDownLis(boolean enable);
+
+  /** Returns <code>true</code> if need to push after commit, and <code>false</code> otherwise */
+  boolean isPushAfterCommit();
+
+  /**
+   * Change the enable state of the commit button.
+   *
+   * @param enable <code>true</code> to enable the button, <code>false</code> to disable it
+   */
+  void setEnableCommitButton(boolean enable);
+
+  /** Give focus to message field. */
+  void focusInMessageField();
+
+  /** Close dialog. */
+  void close();
+
+  /** Show dialog. */
+  void showDialog();
+
+  /** Initialize changed panel. */
+  void setChangesPanelView(ChangesPanelView changesPanelView);
 }

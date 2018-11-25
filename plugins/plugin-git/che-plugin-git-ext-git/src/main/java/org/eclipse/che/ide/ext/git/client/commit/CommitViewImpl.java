@@ -1,21 +1,20 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.git.client.commit;
 
-import org.eclipse.che.ide.ext.git.client.GitLocalizationConstant;
-import org.eclipse.che.ide.ext.git.client.GitResources;
-import org.eclipse.che.ide.ui.window.Window;
+import static org.eclipse.che.ide.util.dom.DomUtils.isWidgetOrChildFocused;
+
 import com.google.gwt.core.client.GWT;
-import com.google.gwt.event.dom.client.ClickEvent;
-import com.google.gwt.event.dom.client.ClickHandler;
+import com.google.gwt.dom.client.NativeEvent;
 import com.google.gwt.event.dom.client.KeyUpEvent;
 import com.google.gwt.event.logical.shared.ValueChangeEvent;
 import com.google.gwt.uibinder.client.UiBinder;
@@ -24,237 +23,199 @@ import com.google.gwt.uibinder.client.UiHandler;
 import com.google.gwt.user.client.Timer;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.CheckBox;
+import com.google.gwt.user.client.ui.FlowPanel;
+import com.google.gwt.user.client.ui.ListBox;
 import com.google.gwt.user.client.ui.TextArea;
 import com.google.gwt.user.client.ui.Widget;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-
+import java.util.List;
 import javax.validation.constraints.NotNull;
+import org.eclipse.che.api.git.shared.Branch;
+import org.eclipse.che.ide.ext.git.client.GitLocalizationConstant;
+import org.eclipse.che.ide.ext.git.client.GitResources;
+import org.eclipse.che.ide.ext.git.client.compare.changespanel.ChangesPanelView;
+import org.eclipse.che.ide.ui.ShiftableTextArea;
+import org.eclipse.che.ide.ui.window.Window;
 
 /**
  * The implementation of {@link CommitView}.
  *
  * @author Andrey Plotnikov
+ * @author Igor Vinokur
  */
 @Singleton
 public class CommitViewImpl extends Window implements CommitView {
-    interface CommitViewImplUiBinder extends UiBinder<Widget, CommitViewImpl> {
+  interface CommitViewImplUiBinder extends UiBinder<Widget, CommitViewImpl> {}
+
+  private static CommitViewImplUiBinder uiBinder = GWT.create(CommitViewImplUiBinder.class);
+
+  @UiField(provided = true)
+  final TextArea message;
+
+  @UiField FlowPanel changesPanel;
+  @UiField CheckBox amend;
+
+  @UiField(provided = true)
+  final GitResources res;
+
+  @UiField(provided = true)
+  final GitLocalizationConstant locale;
+
+  private ListBox remoteBranches;
+  private CheckBox pushAfterCommit;
+  private Button btnCommit;
+  private Button btnCancel;
+  private ActionDelegate delegate;
+
+  /** Create view. */
+  @Inject
+  protected CommitViewImpl(GitResources res, GitLocalizationConstant locale) {
+    this.res = res;
+    this.locale = locale;
+    this.message = new ShiftableTextArea();
+    this.ensureDebugId("git-commit-window");
+
+    this.setTitle(locale.commitTitle());
+
+    Widget widget = uiBinder.createAndBindUi(this);
+    this.setWidget(widget);
+
+    btnCancel =
+        addFooterButton(
+            locale.buttonCancel(), "git-commit-cancel", event -> delegate.onCancelClicked());
+    btnCommit =
+        addFooterButton(
+            locale.buttonCommit(), "git-commit-commit", event -> delegate.onCommitClicked(), true);
+
+    remoteBranches = new ListBox();
+    remoteBranches.setEnabled(false);
+    remoteBranches.getElement().setAttribute("style", "width: 230px");
+
+    pushAfterCommit = new CheckBox();
+    pushAfterCommit.setHTML(locale.commitPushCheckboxTitle());
+    pushAfterCommit.ensureDebugId("push-after-commit-check-box");
+    pushAfterCommit.addValueChangeHandler(event -> remoteBranches.setEnabled(event.getValue()));
+
+    pushAfterCommit.addStyleName(res.gitCSS().spacing());
+    addFooterWidget(pushAfterCommit);
+    addFooterWidget(remoteBranches);
+  }
+
+  @Override
+  public void onEnterPress(NativeEvent evt) {
+    if (isWidgetOrChildFocused(btnCommit)) {
+      delegate.onCommitClicked();
+    } else if (isWidgetOrChildFocused(btnCancel)) {
+      delegate.onCancelClicked();
     }
+  }
 
-    private static CommitViewImplUiBinder ourUiBinder = GWT.create(CommitViewImplUiBinder.class);
+  @NotNull
+  @Override
+  public String getCommitMessage() {
+    return message.getText();
+  }
 
-    /**
-     * The add all uncommited change field.
-     */
-    @UiField
-    CheckBox addAll;
-    /**
-     * The 'include selection' in commit field.
-     */
-    @UiField
-    CheckBox addSelection;
-    /**
-     * The 'commit only selection' field.
-     */
-    @UiField
-    CheckBox onlySelection;
+  @Override
+  public void setMessage(@NotNull String message) {
+    this.message.setText(message);
+  }
 
-    /**
-     * The amend commit flag.
-     */
-    @UiField
-    CheckBox amend;
+  @Override
+  public void setRemoteBranchesList(List<Branch> branches) {
+    remoteBranches.clear();
+    branches.forEach(branch -> remoteBranches.addItem(branch.getDisplayName()));
+  }
 
-    /**
-     * The commit message input field.
-     */
-    @UiField
-    TextArea message;
-    Button btnCommit;
-    Button btnCancel;
-    @UiField(provided = true)
-    final   GitResources            res;
-    @UiField(provided = true)
-    final   GitLocalizationConstant locale;
-    private ActionDelegate          delegate;
+  @Override
+  public boolean isAmend() {
+    return amend.getValue();
+  }
 
-    /**
-     * Create view.
-     *
-     * @param res
-     * @param locale
-     */
-    @Inject
-    protected CommitViewImpl(GitResources res, GitLocalizationConstant locale) {
-        this.res = res;
-        this.locale = locale;
-        this.ensureDebugId("git-commit-window");
+  @Override
+  public void setValueToAmendCheckBox(boolean value) {
+    amend.setValue(value);
+  }
 
-        Widget widget = ourUiBinder.createAndBindUi(this);
+  @Override
+  public void setValueToPushAfterCommitCheckBox(boolean value) {
+    pushAfterCommit.setValue(value);
+  }
 
-        this.setTitle(locale.commitTitle());
-        this.setWidget(widget);
+  @Override
+  public void setEnableAmendCheckBox(boolean enable) {
+    amend.setEnabled(enable);
+  }
 
-        btnCancel = createButton(locale.buttonCancel(), "git-commit-cancel", new ClickHandler() {
+  @Override
+  public void setEnablePushAfterCommitCheckBox(boolean enable) {
+    pushAfterCommit.setEnabled(enable);
+  }
 
-            @Override
-            public void onClick(ClickEvent event) {
-                delegate.onCancelClicked();
-            }
-        });
-        btnCommit = createButton(locale.buttonCommit(), "git-commit-commit", new ClickHandler() {
+  @Override
+  public void setEnableRemoteBranchesDropDownLis(boolean enable) {
+    remoteBranches.setEnabled(enable);
+  }
 
-            @Override
-            public void onClick(ClickEvent event) {
-                delegate.onCommitClicked();
-            }
-        });
-        btnCommit.addStyleName(resources.windowCss().primaryButton());
+  @Override
+  public boolean isPushAfterCommit() {
+    return pushAfterCommit.getValue();
+  }
 
-        addButtonToFooter(btnCommit);
-        addButtonToFooter(btnCancel);
+  @Override
+  public void setEnableCommitButton(boolean enable) {
+    btnCommit.setEnabled(enable);
+  }
+
+  @Override
+  public void focusInMessageField() {
+    new Timer() {
+      @Override
+      public void run() {
+        message.setFocus(true);
+      }
+    }.schedule(300);
+  }
+
+  @Override
+  public void close() {
+    this.hide();
+  }
+
+  @Override
+  public void showDialog() {
+    this.show();
+  }
+
+  @Override
+  public void setDelegate(ActionDelegate delegate) {
+    this.delegate = delegate;
+  }
+
+  @UiHandler("message")
+  public void onMessageChanged(KeyUpEvent event) {
+    delegate.onValueChanged();
+  }
+
+  @UiHandler("amend")
+  public void onAmendValueChange(final ValueChangeEvent<Boolean> event) {
+    if (event.getValue()) {
+      this.delegate.setAmendCommitMessage();
+    } else {
+      this.message.setValue("");
     }
+    delegate.onValueChanged();
+    message.setFocus(true);
+  }
 
-    @Override
-    protected void onEnterClicked() {
-        if (isWidgetFocused(btnCommit)) {
-            delegate.onCommitClicked();
-            return;
-        }
+  @Override
+  public void setChangesPanelView(ChangesPanelView changesPanelView) {
+    this.changesPanel.add(changesPanelView);
+  }
 
-        if (isWidgetFocused(btnCancel)) {
-            delegate.onCancelClicked();
-        }
-    }
-
-    /** {@inheritDoc} */
-    @NotNull
-    @Override
-    public String getMessage() {
-        return message.getText();
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setMessage(@NotNull String message) {
-        this.message.setText(message);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public boolean isAllFilesInclued() {
-        return this.addAll.getValue();
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setAllFilesInclude(boolean isAllFiles) {
-        this.addAll.setValue(isAllFiles);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public boolean isAmend() {
-        return amend.getValue();
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setAmend(boolean isAmend) {
-        amend.setValue(isAmend);
-    }
-
-    @Override
-    public boolean isIncludeSelection() {
-        return this.addSelection.getValue();
-    }
-
-    @Override
-    public void setIncludeSelection(final boolean includeSelection) {
-        this.addSelection.setValue(includeSelection);
-    }
-
-    @Override
-    public boolean isOnlySelection() {
-        return this.onlySelection.getValue();
-    }
-
-    @Override
-    public void setOnlySelection(final boolean onlySelection) {
-        this.onlySelection.setValue(onlySelection);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setEnableCommitButton(boolean enable) {
-        btnCommit.setEnabled(enable);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void focusInMessageField() {
-        new Timer() {
-            @Override
-            public void run() {
-                message.setFocus(true);
-            }
-        }.schedule(300);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void close() {
-        this.hide();
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void showDialog() {
-        this.show();
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void setDelegate(ActionDelegate delegate) {
-        this.delegate = delegate;
-    }
-
-    @UiHandler("message")
-    public void onMessageChanged(KeyUpEvent event) {
-        delegate.onValueChanged();
-    }
-
-    @UiHandler("addAll")
-    public void onAddAllValueChange(final ValueChangeEvent<Boolean> event) {
-        if (event.getValue()) {
-            this.addSelection.setValue(false);
-            this.onlySelection.setValue(false);
-        }
-    }
-
-    @UiHandler("addSelection")
-    public void onAddSelectionValueChange(final ValueChangeEvent<Boolean> event) {
-        if (event.getValue()) {
-            this.addAll.setValue(false);
-            this.onlySelection.setValue(false);
-        }
-    }
-
-    @UiHandler("onlySelection")
-    public void onOnlySelectionValueChange(final ValueChangeEvent<Boolean> event) {
-        if (event.getValue()) {
-            this.addAll.setValue(false);
-            this.addSelection.setValue(false);
-        }
-    }
-
-    @UiHandler("amend")
-    public void onAmendValueChange(final ValueChangeEvent<Boolean> event) {
-        if (event.getValue()) {
-            this.delegate.setAmendCommitMessage();
-        } else {
-            this.message.setValue("");
-            this.setEnableCommitButton(false);
-        }
-    }
+  @Override
+  public String getRemoteBranch() {
+    return remoteBranches.getSelectedValue();
+  }
 }

@@ -1,34 +1,25 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.plugin.maven.client.command;
 
-import com.google.gwt.user.client.Window;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-
+import java.util.LinkedList;
+import java.util.List;
+import org.eclipse.che.ide.api.command.CommandPage;
+import org.eclipse.che.ide.api.command.CommandType;
 import org.eclipse.che.ide.api.icon.Icon;
 import org.eclipse.che.ide.api.icon.IconRegistry;
-import org.eclipse.che.ide.extension.machine.client.command.CommandConfiguration;
-import org.eclipse.che.ide.extension.machine.client.command.CommandConfigurationFactory;
-import org.eclipse.che.ide.extension.machine.client.command.CommandConfigurationPage;
-import org.eclipse.che.ide.extension.machine.client.command.CommandType;
-import org.eclipse.che.ide.extension.machine.client.command.valueproviders.CurrentProjectPathProvider;
-import org.eclipse.che.ide.extension.machine.client.command.valueproviders.CurrentProjectRelativePathProvider;
-import org.eclipse.che.ide.extension.machine.client.command.valueproviders.ServerPortProvider;
 import org.eclipse.che.plugin.maven.client.MavenResources;
-import org.vectomatic.dom.svg.ui.SVGResource;
-
-import javax.validation.constraints.NotNull;
-import java.util.Collection;
-import java.util.LinkedList;
 
 /**
  * Maven command type.
@@ -38,73 +29,47 @@ import java.util.LinkedList;
 @Singleton
 public class MavenCommandType implements CommandType {
 
-    private static final String ID               = "mvn";
-    private static final String DISPLAY_NAME     = "Maven";
-    private static final String COMMAND_TEMPLATE = "mvn clean install";
-    private static final String DEF_PORT         = "8080";
+  private static final String ID = "mvn";
+  private static final String COMMAND_TEMPLATE = "mvn clean install -f ${current.project.path}";
 
-    private final MavenResources                                                       resources;
-    private final CurrentProjectPathProvider                                           currentProjectPathProvider;
-    private final CurrentProjectRelativePathProvider                                   currentProjectRelativePathProvider;
-    private final MavenCommandConfigurationFactory                                     configurationFactory;
-    private final Collection<CommandConfigurationPage<? extends CommandConfiguration>> pages;
+  private final List<CommandPage> pages;
 
-    @Inject
-    public MavenCommandType(MavenResources resources,
-                            MavenCommandPagePresenter page,
-                            CurrentProjectPathProvider currentProjectPathProvider,
-                            CurrentProjectRelativePathProvider currentProjectRelativePathProvider,
-                            IconRegistry iconRegistry) {
-        this.resources = resources;
-        this.currentProjectPathProvider = currentProjectPathProvider;
-        this.currentProjectRelativePathProvider = currentProjectRelativePathProvider;
-        configurationFactory = new MavenCommandConfigurationFactory(this);
-        pages = new LinkedList<>();
-        pages.add(page);
+  @Inject
+  public MavenCommandType(
+      MavenResources resources, MavenCommandPagePresenter page, IconRegistry iconRegistry) {
+    pages = new LinkedList<>();
+    pages.add(page);
 
-        iconRegistry.registerIcon(new Icon(ID + ".commands.category.icon", resources.maven()));
-    }
+    iconRegistry.registerIcon(new Icon("command.type." + ID, resources.maven()));
+  }
 
-    @NotNull
-    @Override
-    public String getId() {
-        return ID;
-    }
+  @Override
+  public String getId() {
+    return ID;
+  }
 
-    @NotNull
-    @Override
-    public String getDisplayName() {
-        return DISPLAY_NAME;
-    }
+  @Override
+  public String getDisplayName() {
+    return "Maven";
+  }
 
-    @NotNull
-    @Override
-    public SVGResource getIcon() {
-        return resources.mavenCommandType();
-    }
+  @Override
+  public String getDescription() {
+    return "Command for executing Maven command line";
+  }
 
-    @NotNull
-    @Override
-    public Collection<CommandConfigurationPage<? extends CommandConfiguration>> getConfigurationPages() {
-        return pages;
-    }
+  @Override
+  public List<CommandPage> getPages() {
+    return pages;
+  }
 
-    @NotNull
-    @Override
-    public CommandConfigurationFactory<MavenCommandConfiguration> getConfigurationFactory() {
-        return configurationFactory;
-    }
+  @Override
+  public String getCommandLineTemplate() {
+    return COMMAND_TEMPLATE;
+  }
 
-    @NotNull
-    @Override
-    public String getCommandTemplate() {
-        return COMMAND_TEMPLATE + " -f " + currentProjectPathProvider.getKey();
-    }
-
-    @Override
-    public String getPreviewUrlTemplate() {
-        //TODO: hardcode http after switching WS Master to https
-        return "http://" + ServerPortProvider.KEY_TEMPLATE.replace("%", DEF_PORT) + "/" +
-               currentProjectRelativePathProvider.getKey();
-    }
+  @Override
+  public String getPreviewUrlTemplate() {
+    return "${server.tomcat8}/${current.project.relpath}";
+  }
 }

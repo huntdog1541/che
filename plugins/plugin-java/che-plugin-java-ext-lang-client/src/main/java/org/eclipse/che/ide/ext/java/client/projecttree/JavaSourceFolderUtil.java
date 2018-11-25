@@ -1,33 +1,24 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.java.client.projecttree;
 
-import org.eclipse.che.api.project.shared.dto.ItemReference;
-import org.eclipse.che.api.workspace.shared.dto.ProjectConfigDto;
-import org.eclipse.che.commons.annotation.Nullable;
-import org.eclipse.che.ide.api.app.CurrentProject;
-import org.eclipse.che.ide.api.project.node.HasProjectConfig;
-import org.eclipse.che.ide.api.project.tree.TreeNode;
-import org.eclipse.che.ide.api.project.tree.VirtualFile;
-import org.eclipse.che.ide.ext.java.client.project.node.JavaFileNode;
-import org.eclipse.che.ide.ext.java.client.project.node.PackageNode;
-import org.eclipse.che.ide.ext.java.client.project.node.jar.JarFileNode;
+import static org.eclipse.che.ide.ext.java.shared.Constants.SOURCE_FOLDER;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Null;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-
-import static org.eclipse.che.ide.ext.java.shared.Constants.SOURCE_FOLDER;
+import javax.validation.constraints.NotNull;
+import org.eclipse.che.commons.annotation.Nullable;
+import org.eclipse.che.ide.api.resources.Project;
 
 /**
  * @author Vladyslav Zhukovskii
@@ -35,143 +26,69 @@ import static org.eclipse.che.ide.ext.java.shared.Constants.SOURCE_FOLDER;
  */
 public class JavaSourceFolderUtil {
 
-    /** Indicates if the specified item is a source folder. */
-    public static boolean isSourceFolder(ItemReference item, HasProjectConfig projectNode) {
-        if ("folder".equals(item.getType())) {
-            String projectBuilder = getProjectBuilder(projectNode);
+  /**
+   * Returns source folders list of the project. Every path in the returned list starts and ends
+   * with separator char /.
+   */
+  @NotNull
+  public static List<String> getSourceFolders(@NotNull Project project) {
+    String projectBuilder = getProjectBuilder(project.getType());
 
-            if (projectBuilder != null) {
-                ProjectConfigDto projectConfig = projectNode.getProjectConfig();
-                Map<String, List<String>> attributes = projectConfig.getAttributes();
+    return doGetSourceFolders(project, projectBuilder);
+  }
 
-                final String projectPath = projectConfig.getPath();
-                final String itemPath = item.getPath();
+  @NotNull
+  private static List<String> doGetSourceFolders(Project projectConfig, String projectBuilder) {
+    List<String> allSourceFolders = new LinkedList<>();
 
-                List<String> sourceFolders = attributes.get(SOURCE_FOLDER);
-                boolean isSrcDir = isSourceFolder(sourceFolders, projectPath, itemPath);
+    String projectPath = removeEndingPathSeparator(projectConfig.getPath());
+    Map<String, List<String>> attributes = projectConfig.getAttributes();
 
-                List<String> testSourceFolders = attributes.get(projectBuilder + ".test.source.folder");
-                boolean isTestDir = isSourceFolder(testSourceFolders, projectPath, itemPath);
-
-                return isSrcDir || isTestDir;
-            }
-        }
-
-        return false;
+    List<String> sourceFolders = attributes.get(SOURCE_FOLDER);
+    if (sourceFolders != null) {
+      for (String sourceFolder : sourceFolders) {
+        allSourceFolders.add(projectPath + addStartingPathSeparator(sourceFolder) + '/');
+      }
     }
 
-    private static boolean isSourceFolder(@Null List<String> sourceFolders, String projectPath, String itemPath) {
-        projectPath = removeEndingPathSeparator(projectPath);
-
-        if (sourceFolders != null) {
-            for (String sourceFolder : sourceFolders) {
-                if ((projectPath + addStartingPathSeparator(sourceFolder)).equals(itemPath)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+    List<String> testSourceFolders = attributes.get(projectBuilder + ".test.source.folder");
+    if (testSourceFolders != null) {
+      for (String testSourceFolder : testSourceFolders) {
+        allSourceFolders.add(projectPath + addStartingPathSeparator(testSourceFolder) + '/');
+      }
     }
 
+    return allSourceFolders;
+  }
 
-    /**
-     * Returns source folders list of the project to which the specified node belongs.
-     * Every path in the returned list starts and ends with separator char /.
-     */
-    @NotNull
-    public static List<String> getSourceFolders(TreeNode<?> node) {
-        HasProjectConfig project = node.getProject();
-        String projectBuilder = getProjectBuilder(project);
-
-        return doGetSourceFolders(project.getProjectConfig(), projectBuilder);
+  private static String removeEndingPathSeparator(String path) {
+    if (path.endsWith("/")) {
+      return path.substring(0, path.length() - 1);
     }
 
-    /**
-     * Returns source folders list of the project.
-     * Every path in the returned list starts and ends with separator char /.
-     */
-    @NotNull
-    public static List<String> getSourceFolders(@NotNull CurrentProject project) {
-        ProjectConfigDto projectConfig = project.getProjectConfig();
-        String projectBuilder = getProjectBuilder(projectConfig.getType());
+    return path;
+  }
 
-        return doGetSourceFolders(projectConfig, projectBuilder);
+  private static String addStartingPathSeparator(String path) {
+    if (!path.startsWith("/")) {
+      return "/" + path;
     }
 
-    @NotNull
-    private static List<String> doGetSourceFolders(ProjectConfigDto projectConfig, String projectBuilder) {
-        List<String> allSourceFolders = new LinkedList<>();
+    return path;
+  }
 
-        String projectPath = removeEndingPathSeparator(projectConfig.getPath());
-        Map<String, List<String>> attributes = projectConfig.getAttributes();
-
-        List<String> sourceFolders = attributes.get(SOURCE_FOLDER);
-        if (sourceFolders != null) {
-            for (String sourceFolder : sourceFolders) {
-                allSourceFolders.add(projectPath + addStartingPathSeparator(sourceFolder) + '/');
-            }
-        }
-
-        List<String> testSourceFolders = attributes.get(projectBuilder + ".test.source.folder");
-        if (testSourceFolders != null) {
-            for (String testSourceFolder : testSourceFolders) {
-                allSourceFolders.add(projectPath + addStartingPathSeparator(testSourceFolder) + '/');
-            }
-        }
-
-        return allSourceFolders;
+  @Nullable
+  public static String getProjectBuilder(@Nullable String projectType) {
+    if (projectType == null) {
+      return null;
     }
 
-    public static String getFQNForFile(VirtualFile file) {
-        String packageName = "";
-        if (file instanceof JavaFileNode) {
-            if (((JavaFileNode)file).getParent() instanceof PackageNode) {
-                packageName = ((PackageNode)((JavaFileNode)file).getParent()).getPackage();
-            }
-            if (!packageName.isEmpty()) {
-                packageName = packageName + ".";
-            }
-            return packageName + file.getName().substring(0, file.getName().lastIndexOf('.'));
-        } else if (file instanceof JarFileNode) {
-            return file.getPath();
-        }
-        return file.getName().substring(0, file.getName().lastIndexOf('.'));
+    switch (projectType) {
+      case "maven":
+      case "ant":
+        return projectType;
+      default:
+        return null;
     }
-
-    private static String removeEndingPathSeparator(String path) {
-        if (path.endsWith("/")) {
-            return path.substring(0, path.length() - 1);
-        }
-
-        return path;
-    }
-
-    private static String addStartingPathSeparator(String path) {
-        if (!path.startsWith("/")) {
-            return "/" + path;
-        }
-
-        return path;
-    }
-
-    @Nullable
-    public static String getProjectBuilder(HasProjectConfig node) {
-        return getProjectBuilder(node.getProjectConfig().getType());
-    }
-
-    @Nullable
-    public static String getProjectBuilder(@Nullable String projectType) {
-        if (projectType == null) {
-            return null;
-        }
-
-        switch (projectType) {
-            case "maven":
-            case "ant":
-                return projectType;
-            default:
-                return null;
-        }
-    }
+  }
 }

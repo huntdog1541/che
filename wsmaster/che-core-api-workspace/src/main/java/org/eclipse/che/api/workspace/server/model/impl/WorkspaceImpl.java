@@ -1,241 +1,370 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.workspace.server.model.impl;
-
-import org.eclipse.che.api.core.model.workspace.Workspace;
-import org.eclipse.che.api.core.model.workspace.WorkspaceConfig;
-import org.eclipse.che.api.core.model.workspace.WorkspaceRuntime;
-import org.eclipse.che.api.core.model.workspace.WorkspaceStatus;
-import org.eclipse.che.commons.lang.NameGenerator;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-
-import static com.google.common.base.MoreObjects.firstNonNull;
-import static org.eclipse.che.api.core.model.workspace.WorkspaceStatus.STOPPED;
+import javax.persistence.CascadeType;
+import javax.persistence.CollectionTable;
+import javax.persistence.Column;
+import javax.persistence.ElementCollection;
+import javax.persistence.Entity;
+import javax.persistence.EntityListeners;
+import javax.persistence.FetchType;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
+import javax.persistence.MapKeyColumn;
+import javax.persistence.NamedQueries;
+import javax.persistence.NamedQuery;
+import javax.persistence.OneToOne;
+import javax.persistence.PrePersist;
+import javax.persistence.PreUpdate;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+import org.eclipse.che.account.shared.model.Account;
+import org.eclipse.che.account.spi.AccountImpl;
+import org.eclipse.che.api.core.model.workspace.Runtime;
+import org.eclipse.che.api.core.model.workspace.Workspace;
+import org.eclipse.che.api.core.model.workspace.WorkspaceConfig;
+import org.eclipse.che.api.core.model.workspace.WorkspaceStatus;
+import org.eclipse.che.commons.lang.NameGenerator;
+import org.eclipse.persistence.descriptors.DescriptorEvent;
+import org.eclipse.persistence.descriptors.DescriptorEventAdapter;
 
 /**
  * Data object for {@link Workspace}.
  *
  * @author Yevhenii Voevodin
  */
+@Entity(name = "Workspace")
+@Table(name = "workspace")
+@NamedQueries({
+  @NamedQuery(
+      name = "Workspace.getByNamespace",
+      query = "SELECT w FROM Workspace w WHERE w.account.name = :namespace"),
+  @NamedQuery(
+      name = "Workspace.getByName",
+      query = "SELECT w FROM Workspace w WHERE w.account.name = :namespace AND w.name = :name"),
+  @NamedQuery(name = "Workspace.getAll", query = "SELECT w FROM Workspace w"),
+  @NamedQuery(
+      name = "Workspace.getByTemporary",
+      query = "SELECT w " + "FROM Workspace w " + "WHERE w.isTemporary = :temporary "),
+  @NamedQuery(name = "Workspace.getAllCount", query = "SELECT COUNT(w) FROM Workspace w"),
+  @NamedQuery(
+      name = "Workspace.getByNamespaceCount",
+      query = "SELECT COUNT(w) " + "FROM Workspace w " + "WHERE w.account.name = :namespace "),
+  @NamedQuery(
+      name = "Workspace.getByTemporaryCount",
+      query = "SELECT COUNT(w) " + "FROM Workspace w " + "WHERE w.isTemporary = :temporary ")
+})
+@EntityListeners(WorkspaceImpl.SyncNameOnUpdateAndPersistEventListener.class)
 public class WorkspaceImpl implements Workspace {
 
-    public static WorkspaceImplBuilder builder() {
-        return new WorkspaceImplBuilder();
+  public static WorkspaceImplBuilder builder() {
+    return new WorkspaceImplBuilder();
+  }
+
+  @Id
+  @Column(name = "id")
+  private String id;
+
+  /**
+   * The original workspace name is workspace.config.name this attribute is stored for unique
+   * constraint with account id. See {@link #syncName()}.
+   */
+  @Column(name = "name")
+  private String name;
+
+  @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
+  @JoinColumn(name = "config_id")
+  private WorkspaceConfigImpl config;
+
+  @ElementCollection(fetch = FetchType.EAGER)
+  @CollectionTable(name = "workspace_attributes", joinColumns = @JoinColumn(name = "workspace_id"))
+  @MapKeyColumn(name = "attributes_key")
+  @Column(name = "attributes")
+  private Map<String, String> attributes;
+
+  @Column(name = "istemporary")
+  private boolean isTemporary;
+
+  @ManyToOne
+  @JoinColumn(name = "accountid", nullable = false)
+  private AccountImpl account;
+
+  @Transient private WorkspaceStatus status;
+
+  @Transient private Runtime runtime;
+
+  public WorkspaceImpl() {}
+
+  public WorkspaceImpl(String id, Account account, WorkspaceConfig config) {
+    this(id, account, config, null, null, false, null);
+  }
+
+  public WorkspaceImpl(
+      String id,
+      Account account,
+      WorkspaceConfig config,
+      Runtime runtime,
+      Map<String, String> attributes,
+      boolean isTemporary,
+      WorkspaceStatus status) {
+    this.id = id;
+    if (account != null) {
+      this.account = new AccountImpl(account);
     }
-
-    private final String id;
-    private final String namespace;
-
-    private WorkspaceConfigImpl  config;
-    private boolean              isTemporary;
-    private WorkspaceStatus      status;
-    private Map<String, String>  attributes;
-    private WorkspaceRuntimeImpl runtime;
-
-    public WorkspaceImpl(String id, String namespace, WorkspaceConfig config) {
-        this(id, namespace, config, null, null, false, STOPPED);
+    if (config != null) {
+      this.config = new WorkspaceConfigImpl(config);
     }
-
-    public WorkspaceImpl(String id,
-                         String namespace,
-                         WorkspaceConfig config,
-                         WorkspaceRuntime runtime,
-                         Map<String, String> attributes,
-                         boolean isTemporary,
-                         WorkspaceStatus status) {
-        this.id = id;
-        this.namespace = namespace;
-        this.config = new WorkspaceConfigImpl(config);
-        if (runtime  != null) {
-            this.runtime = new WorkspaceRuntimeImpl(runtime);
-        }
-        if (attributes != null) {
-            this.attributes = new HashMap<>(attributes);
-        }
-        this.status = firstNonNull(status, STOPPED);
-        this.isTemporary = isTemporary;
+    if (runtime != null) {
+      this.runtime =
+          new RuntimeImpl(runtime.getActiveEnv(), runtime.getMachines(), runtime.getOwner());
     }
+    if (attributes != null) {
+      this.attributes = new HashMap<>(attributes);
+    }
+    this.isTemporary = isTemporary;
+    this.status = status;
+  }
 
-    public WorkspaceImpl(Workspace workspace) {
-        this(workspace.getId(),
-             workspace.getNamespace(),
-             workspace.getConfig());
-        this.attributes = new HashMap<>(workspace.getAttributes());
-        if (workspace.getRuntime() != null) {
-            this.runtime = new WorkspaceRuntimeImpl(workspace.getRuntime());
-        }
-        this.isTemporary = workspace.isTemporary();
-        this.status = firstNonNull(workspace.getStatus(), STOPPED);
+  public WorkspaceImpl(Workspace workspace, Account account) {
+    this(
+        workspace.getId(),
+        account,
+        workspace.getConfig(),
+        workspace.getRuntime(),
+        workspace.getAttributes(),
+        workspace.isTemporary(),
+        workspace.getStatus());
+  }
+
+  public WorkspaceImpl(WorkspaceImpl workspace) {
+    this(workspace, workspace.account);
+  }
+
+  @Override
+  public String getId() {
+    return id;
+  }
+
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  @Override
+  public String getNamespace() {
+    if (account != null) {
+      return account.getName();
+    }
+    return null;
+  }
+
+  public void setAccount(AccountImpl account) {
+    this.account = account;
+  }
+
+  public AccountImpl getAccount() {
+    return account;
+  }
+
+  @Override
+  public WorkspaceConfigImpl getConfig() {
+    return config;
+  }
+
+  public void setConfig(WorkspaceConfigImpl config) {
+    this.config = config;
+  }
+
+  @Override
+  public Map<String, String> getAttributes() {
+    if (attributes == null) {
+      attributes = new HashMap<>();
+    }
+    return attributes;
+  }
+
+  public void setAttributes(Map<String, String> attributes) {
+    this.attributes = attributes;
+  }
+
+  @Override
+  public boolean isTemporary() {
+    return isTemporary;
+  }
+
+  public void setTemporary(boolean temporary) {
+    isTemporary = temporary;
+  }
+
+  @Override
+  public WorkspaceStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(WorkspaceStatus status) {
+    this.status = status;
+  }
+
+  @Override
+  public Runtime getRuntime() {
+    return runtime;
+  }
+
+  public void setRuntime(Runtime runtime) {
+    this.runtime = runtime;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) return true;
+    if (!(obj instanceof WorkspaceImpl)) return false;
+    final WorkspaceImpl other = (WorkspaceImpl) obj;
+    return Objects.equals(id, other.id)
+        && Objects.equals(getNamespace(), other.getNamespace())
+        && Objects.equals(status, other.status)
+        && isTemporary == other.isTemporary
+        && getAttributes().equals(other.getAttributes())
+        && Objects.equals(config, other.config)
+        && Objects.equals(runtime, other.runtime);
+  }
+
+  @Override
+  public int hashCode() {
+    int hash = 7;
+    hash = 31 * hash + Objects.hashCode(id);
+    hash = 31 * hash + Objects.hashCode(getNamespace());
+    hash = 31 * hash + Objects.hashCode(status);
+    hash = 31 * hash + Objects.hashCode(config);
+    hash = 31 * hash + getAttributes().hashCode();
+    hash = 31 * hash + Boolean.hashCode(isTemporary);
+    hash = 31 * hash + Objects.hashCode(runtime);
+    return hash;
+  }
+
+  @Override
+  public String toString() {
+    return "WorkspaceImpl{"
+        + "id='"
+        + id
+        + '\''
+        + ", namespace='"
+        + getNamespace()
+        + '\''
+        + ", name='"
+        + name
+        + '\''
+        + ", config="
+        + config
+        + ", isTemporary="
+        + isTemporary
+        + ", status="
+        + status
+        + ", attributes="
+        + attributes
+        + ", runtime="
+        + runtime
+        + '}';
+  }
+
+  /** Syncs {@link #name} with config name. */
+  private void syncName() {
+    name = config == null ? null : config.getName();
+  }
+
+  /**
+   * {@link PreUpdate} and {@link PrePersist} methods are not called when the configuration is
+   * updated and workspace object is not, while listener methods are always called, even if
+   * workspace instance is not changed.
+   */
+  public static class SyncNameOnUpdateAndPersistEventListener extends DescriptorEventAdapter {
+    @Override
+    public void preUpdate(DescriptorEvent event) {
+      ((WorkspaceImpl) event.getObject()).syncName();
     }
 
     @Override
-    public String getId() {
-        return id;
+    public void prePersist(DescriptorEvent event) {
+      ((WorkspaceImpl) event.getObject()).syncName();
     }
 
     @Override
-    public String getNamespace() {
-        return namespace;
+    public void preUpdateWithChanges(DescriptorEvent event) {
+      ((WorkspaceImpl) event.getObject()).syncName();
+    }
+  }
+
+  /**
+   * Helps to build complex {@link WorkspaceImpl workspace} instance.
+   *
+   * @see WorkspaceImpl#builder()
+   */
+  public static class WorkspaceImplBuilder {
+
+    private String id;
+    private Account account;
+    private boolean isTemporary;
+    private WorkspaceStatus status;
+    private WorkspaceConfig config;
+    private Runtime runtime;
+    private Map<String, String> attributes;
+
+    private WorkspaceImplBuilder() {}
+
+    public WorkspaceImpl build() {
+      return new WorkspaceImpl(id, account, config, runtime, attributes, isTemporary, status);
     }
 
-    @Override
-    public WorkspaceStatus getStatus() {
-        return status;
+    public WorkspaceImplBuilder generateId() {
+      id = NameGenerator.generate("workspace", 16);
+      return this;
     }
 
-    public void setStatus(WorkspaceStatus status) {
-        this.status = status;
+    public WorkspaceImplBuilder setConfig(WorkspaceConfig workspaceConfig) {
+      this.config = workspaceConfig;
+      return this;
     }
 
-    public void setConfig(WorkspaceConfigImpl config) {
-        this.config = config;
+    public WorkspaceImplBuilder setId(String id) {
+      this.id = id;
+      return this;
     }
 
-    @Override
-    public Map<String, String> getAttributes() {
-        if (attributes == null) {
-            attributes = new HashMap<>();
-        }
-        return attributes;
+    public WorkspaceImplBuilder setAccount(Account account) {
+      this.account = account;
+      return this;
     }
 
-    public void setAttributes(Map<String, String> attributes) {
-        this.attributes = attributes;
+    public WorkspaceImplBuilder setTemporary(boolean isTemporary) {
+      this.isTemporary = isTemporary;
+      return this;
     }
 
-    @Override
-    public boolean isTemporary() {
-        return isTemporary;
+    public WorkspaceImplBuilder setStatus(WorkspaceStatus status) {
+      this.status = status;
+      return this;
     }
 
-    public void setTemporary(boolean isTemporary) {
-        this.isTemporary = isTemporary;
+    public WorkspaceImplBuilder setAttributes(Map<String, String> attributes) {
+      this.attributes = attributes;
+      return this;
     }
 
-    @Override
-    public WorkspaceConfigImpl getConfig() {
-        return config;
+    public WorkspaceImplBuilder setRuntime(Runtime runtime) {
+      this.runtime = runtime;
+      return this;
     }
-
-    @Override
-    public WorkspaceRuntimeImpl getRuntime() {
-        return runtime;
-    }
-
-    public void setRuntime(WorkspaceRuntimeImpl runtime) {
-        this.runtime = runtime;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (!(obj instanceof WorkspaceImpl)) return false;
-        final WorkspaceImpl other = (WorkspaceImpl)obj;
-        return Objects.equals(id, other.id)
-               && Objects.equals(namespace, other.namespace)
-               && Objects.equals(status, other.status)
-               && isTemporary == other.isTemporary
-               && getAttributes().equals(other.getAttributes())
-               && Objects.equals(config, other.config)
-               && Objects.equals(runtime, other.runtime);
-    }
-
-    @Override
-    public int hashCode() {
-        int hash = 7;
-        hash = 31 * hash + Objects.hashCode(id);
-        hash = 31 * hash + Objects.hashCode(namespace);
-        hash = 31 * hash + Objects.hashCode(status);
-        hash = 31 * hash + Objects.hashCode(config);
-        hash = 31 * hash + getAttributes().hashCode();
-        hash = 31 * hash + Boolean.hashCode(isTemporary);
-        hash = 31 * hash + Objects.hashCode(runtime);
-        return hash;
-    }
-
-    @Override
-    public String toString() {
-        return "WorkspaceImpl{" +
-               "id='" + id + '\'' +
-               ", namespace='" + namespace + '\'' +
-               ", config=" + config +
-               ", isTemporary=" + isTemporary +
-               ", status=" + status +
-               ", attributes=" + attributes +
-               ", runtime=" + runtime +
-               '}';
-    }
-
-    /**
-     * Helps to build complex {@link WorkspaceImpl users workspace instance}.
-     *
-     * @see WorkspaceImpl#builder()
-     */
-    public static class WorkspaceImplBuilder {
-
-        private String              id;
-        private String              namespace;
-        private boolean             isTemporary;
-        private WorkspaceStatus     status;
-        private WorkspaceConfigImpl config;
-        private WorkspaceRuntimeImpl runtime;
-        private Map<String, String> attributes;
-
-        private WorkspaceImplBuilder() {}
-
-        public WorkspaceImpl build() {
-            return new WorkspaceImpl(id, namespace, config, runtime, attributes, isTemporary, status);
-        }
-
-        public WorkspaceImplBuilder generateId() {
-            id = NameGenerator.generate("workspace", 16);
-            return this;
-        }
-
-        public WorkspaceImplBuilder setConfig(WorkspaceConfig workspaceConfig) {
-            this.config = new WorkspaceConfigImpl(workspaceConfig);
-            return this;
-        }
-
-        public WorkspaceImplBuilder setId(String id) {
-            this.id = id;
-            return this;
-        }
-
-        public WorkspaceImplBuilder setNamespace(String namespace) {
-            this.namespace = namespace;
-            return this;
-        }
-
-        public WorkspaceImplBuilder setTemporary(boolean isTemporary) {
-            this.isTemporary = isTemporary;
-            return this;
-        }
-
-        public WorkspaceImplBuilder setStatus(WorkspaceStatus status) {
-            this.status = status;
-            return this;
-        }
-
-        public WorkspaceImplBuilder setAttributes(Map<String, String> attributes) {
-            this.attributes = attributes;
-            return this;
-        }
-
-        public WorkspaceImplBuilder setRuntime(WorkspaceRuntimeImpl runtime) {
-            this.runtime = runtime;
-            return this;
-        }
-    }
+  }
 }

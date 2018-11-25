@@ -1,172 +1,78 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.git.client.history;
 
+import java.util.List;
+import javax.validation.constraints.NotNull;
 import org.eclipse.che.api.git.shared.Revision;
 import org.eclipse.che.ide.api.mvp.View;
-import org.eclipse.che.ide.api.parts.base.BaseActionDelegate;
-
-import javax.validation.constraints.NotNull;
-import java.util.List;
 
 /**
  * The view of {@link HistoryPresenter}.
  *
- * @author <a href="mailto:aplotnikov@codenvy.com">Andrey Plotnikov</a>
+ * @author Igor Vinokur
  */
 public interface HistoryView extends View<HistoryView.ActionDelegate> {
-    /** Needs for delegate some function into History view. */
-    public interface ActionDelegate extends BaseActionDelegate {
-        /** Performs any actions appropriate in response to the user having pressed the Refresh button. */
-        void onRefreshClicked();
-
-        /** Performs any actions appropriate in response to the user having pressed the ProjectChanges button. */
-        void onProjectChangesClicked();
-
-        /** Performs any actions appropriate in response to the user having pressed the ResourceChanges button. */
-        void onResourceChangesClicked();
-
-        /** Performs any actions appropriate in response to the user having pressed the DiffWithIndex button. */
-        void onDiffWithIndexClicked();
-
-        /** Performs any actions appropriate in response to the user having pressed the DiffWithWorkTree button. */
-        void onDiffWithWorkTreeClicked();
-
-        /** Performs any actions appropriate in response to the user having pressed the DiffWithPrevCommit button. */
-        void onDiffWithPrevCommitClicked();
-
-        /**
-         * Performs any action in response to the user having select revision.
-         *
-         * @param revision
-         *         selected revision
-         */
-        void onRevisionSelected(@NotNull Revision revision);
-    }
-
-    void setVisible(boolean visible);
+  /** Needs for delegate some function into list of revisions view. */
+  interface ActionDelegate {
+    /** Performs any actions appropriate in response to the user having pressed the Close button. */
+    void onCloseClicked();
 
     /**
-     * Set available revisions.
-     *
-     * @param revisions
-     *         git revisions
+     * Performs any actions appropriate in response to the user having pressed the Compare button.
      */
-    void setRevisions(@NotNull List<Revision> revisions);
+    void onCompareClicked();
 
     /**
-     * Change the selected state of the changes in project button.
+     * Performs any action in response to the user having select revision.
      *
-     * @param selected
-     *         selected state
+     * @param revision selected revision
      */
-    void selectProjectChangesButton(boolean selected);
+    void onRevisionSelected(@NotNull Revision revision);
 
-    /**
-     * Change the selected state of the resource changes button.
-     *
-     * @param selected
-     *         selected state
-     */
-    void selectResourceChangesButton(boolean selected);
+    /** Performs any action in response to the user do not have double-clicked any revision. */
+    void onRevisionDoubleClicked();
 
-    /**
-     * Change the selected state of the diff with index button.
-     *
-     * @param selected
-     *         selected state
-     */
-    void selectDiffWithIndexButton(boolean selected);
+    /** Performs any action in response to the user do not have any selected revision. */
+    void onRevisionUnselected();
 
-    /**
-     * Change the selected state of the diff with working tree button.
-     *
-     * @param selected
-     *         selected state
-     */
-    void selectDiffWithWorkingTreeButton(boolean selected);
+    /** Occurs when the last entry in the list has been displayed. */
+    void onScrolledToButton();
+  }
 
-    /**
-     * Change the selected state of the diff with previous version button.
-     *
-     * @param selected
-     *         selected state
-     */
-    void selectDiffWithPrevVersionButton(boolean selected);
+  /**
+   * Set available revisions.
+   *
+   * @param revisions git commits
+   */
+  void setRevisions(@NotNull List<Revision> revisions);
 
-    /**
-     * Set commit A date into view.
-     *
-     * @param date
-     *         commit A date
-     */
-    void setCommitADate(@NotNull String date);
+  /**
+   * Change the enable state of the compare button.
+   *
+   * @param enabled <code>true</code> to enable the button, <code>false</code> to disable it
+   */
+  void setEnableCompareButton(boolean enabled);
 
-    /**
-     * Set commit B date into view.
-     *
-     * @param date
-     *         commit B date
-     */
-    void setCommitBDate(@NotNull String date);
+  /**
+   * Set message to description field.
+   *
+   * @param description description message
+   */
+  void setDescription(String description);
 
-    /**
-     * Set commit A revision into view.
-     *
-     * @param revision
-     *         commit A revision
-     */
-    void setCommitARevision(@NotNull String revision);
+  /** Close dialog. */
+  void close();
 
-    /**
-     * Set commit B revision into view.
-     *
-     * @param revision
-     *         commit B revision
-     */
-    void setCommitBRevision(@NotNull String revision);
-
-    /**
-     * Set compare type into view.
-     *
-     * @param type
-     *         compare type
-     */
-    void setCompareType(@NotNull String type);
-
-    /**
-     * Set diff context into view.
-     *
-     * @param diffContext
-     *         diff between different commits
-     */
-    void setDiffContext(@NotNull String diffContext);
-
-    /**
-     * Change the visible state of the commit B panel.
-     *
-     * @param visible
-     *         <code>true</code> to show the panel, <code>false</code> to hire it
-     */
-    void setCommitBPanelVisible(boolean visible);
-
-    /**
-     * Sets dialog title.
-     *
-     * @param title
-     *         title of dialog
-     */
-    void setTitle(String title);
-
-    /** Clear all fields and panels of the view.*/
-    void clear();
-
+  /** Show dialog. */
+  void showDialog();
 }

@@ -1,32 +1,27 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.gwt.client.command;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-
+import java.util.LinkedList;
+import java.util.List;
+import org.eclipse.che.ide.api.command.CommandPage;
+import org.eclipse.che.ide.api.command.CommandType;
 import org.eclipse.che.ide.api.icon.Icon;
 import org.eclipse.che.ide.api.icon.IconRegistry;
 import org.eclipse.che.ide.ext.gwt.client.GwtResources;
-import org.eclipse.che.ide.extension.machine.client.command.CommandConfiguration;
-import org.eclipse.che.ide.extension.machine.client.command.CommandConfigurationFactory;
-import org.eclipse.che.ide.extension.machine.client.command.CommandConfigurationPage;
-import org.eclipse.che.ide.extension.machine.client.command.CommandType;
-import org.eclipse.che.ide.extension.machine.client.command.valueproviders.CurrentProjectPathProvider;
-import org.eclipse.che.ide.extension.machine.client.command.valueproviders.DevMachineHostNameProvider;
-import org.vectomatic.dom.svg.ui.SVGResource;
-
-import javax.validation.constraints.NotNull;
-import java.util.Collection;
-import java.util.LinkedList;
+import org.eclipse.che.ide.macro.CurrentProjectPathMacro;
+import org.eclipse.che.ide.macro.DevMachineHostNameMacro;
 
 /**
  * GWT command type.
@@ -36,73 +31,61 @@ import java.util.LinkedList;
 @Singleton
 public class GwtCommandType implements CommandType {
 
-    public static final String COMMAND_TEMPLATE = "mvn clean gwt:run-codeserver";
+  public static final String COMMAND_TEMPLATE = "mvn clean gwt:run-codeserver";
 
-    private static final String ID           = "gwt";
-    private static final String DISPLAY_NAME = "GWT";
+  private static final String ID = "gwt";
 
-    private final GwtResources                   resources;
-    private final CurrentProjectPathProvider     currentProjectPathProvider;
-    private final DevMachineHostNameProvider     devMachineHostNameProvider;
-    private final GwtCommandConfigurationFactory configurationFactory;
+  private final CurrentProjectPathMacro currentProjectPathMacro;
+  private final DevMachineHostNameMacro devMachineHostNameMacro;
 
-    private final Collection<CommandConfigurationPage<? extends CommandConfiguration>> pages;
+  private final List<CommandPage> pages;
 
-    @Inject
-    public GwtCommandType(GwtResources resources,
-                          GwtCommandPagePresenter page,
-                          CurrentProjectPathProvider currentProjectPathProvider,
-                          DevMachineHostNameProvider devMachineHostNameProvider,
-                          IconRegistry iconRegistry) {
-        this.resources = resources;
-        this.currentProjectPathProvider = currentProjectPathProvider;
-        this.devMachineHostNameProvider = devMachineHostNameProvider;
-        configurationFactory = new GwtCommandConfigurationFactory(this);
-        pages = new LinkedList<>();
-        pages.add(page);
+  @Inject
+  public GwtCommandType(
+      GwtResources resources,
+      GwtCommandPagePresenter page,
+      CurrentProjectPathMacro currentProjectPathMacro,
+      DevMachineHostNameMacro devMachineHostNameMacro,
+      IconRegistry iconRegistry) {
+    this.currentProjectPathMacro = currentProjectPathMacro;
+    this.devMachineHostNameMacro = devMachineHostNameMacro;
+    pages = new LinkedList<>();
+    pages.add(page);
 
-        iconRegistry.registerIcon(new Icon(ID + ".commands.category.icon", resources.gwtCommandType()));
-    }
+    iconRegistry.registerIcon(new Icon("command.type." + ID, resources.gwtCommandType()));
+  }
 
-    @NotNull
-    @Override
-    public String getId() {
-        return ID;
-    }
+  @Override
+  public String getId() {
+    return ID;
+  }
 
-    @NotNull
-    @Override
-    public String getDisplayName() {
-        return DISPLAY_NAME;
-    }
+  @Override
+  public String getDisplayName() {
+    return "GWT";
+  }
 
-    @NotNull
-    @Override
-    public SVGResource getIcon() {
-        return resources.gwtCommandType();
-    }
+  @Override
+  public String getDescription() {
+    return "Command for launching GWT Super Dev Mode";
+  }
 
-    @NotNull
-    @Override
-    public Collection<CommandConfigurationPage<? extends CommandConfiguration>> getConfigurationPages() {
-        return pages;
-    }
+  @Override
+  public List<CommandPage> getPages() {
+    return pages;
+  }
 
-    @NotNull
-    @Override
-    public CommandConfigurationFactory<GwtCommandConfiguration> getConfigurationFactory() {
-        return configurationFactory;
-    }
+  @Override
+  public String getCommandLineTemplate() {
+    return COMMAND_TEMPLATE
+        + " -f "
+        + currentProjectPathMacro.getName()
+        + " -Dgwt.bindAddress="
+        + devMachineHostNameMacro.getName();
+  }
 
-    @NotNull
-    @Override
-    public String getCommandTemplate() {
-        return COMMAND_TEMPLATE + " -f " + currentProjectPathProvider.getKey() + " -Dgwt.bindAddress=" +
-               devMachineHostNameProvider.getKey();
-    }
-
-    @Override
-    public String getPreviewUrlTemplate() {
-        return "";
-    }
+  @Override
+  public String getPreviewUrlTemplate() {
+    return "";
+  }
 }

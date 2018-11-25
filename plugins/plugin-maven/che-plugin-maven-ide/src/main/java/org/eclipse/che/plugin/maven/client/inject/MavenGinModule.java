@@ -1,29 +1,33 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.plugin.maven.client.inject;
 
-import com.google.gwt.inject.client.AbstractGinModule;
-import com.google.gwt.inject.client.assistedinject.GinFactoryModuleBuilder;
-import com.google.gwt.inject.client.multibindings.GinMultibinder;
+import static com.google.gwt.inject.client.multibindings.GinMultibinder.newSetBinder;
 
+import com.google.gwt.inject.client.AbstractGinModule;
+import org.eclipse.che.api.languageserver.shared.model.LanguageDescription;
+import org.eclipse.che.ide.api.command.CommandType;
 import org.eclipse.che.ide.api.extension.ExtensionGinModule;
-import org.eclipse.che.ide.api.project.node.interceptor.NodeInterceptor;
+import org.eclipse.che.ide.api.preferences.PreferencePagePresenter;
 import org.eclipse.che.ide.api.project.type.wizard.ProjectWizardRegistrar;
-import org.eclipse.che.ide.extension.machine.client.command.CommandType;
+import org.eclipse.che.ide.api.resources.ResourceInterceptor;
+import org.eclipse.che.ide.project.ResolvingProjectStateHolder;
+import org.eclipse.che.plugin.maven.client.MavenLanguageDescriptionProvider;
 import org.eclipse.che.plugin.maven.client.command.MavenCommandType;
-import org.eclipse.che.plugin.maven.client.editor.PomEditorConfigurationFactory;
-import org.eclipse.che.plugin.maven.client.editor.PomReconsilingStrategyFactory;
-import org.eclipse.che.plugin.maven.client.project.MavenContentRootInterceptor;
-import org.eclipse.che.plugin.maven.client.project.MavenExternalLibrariesInterceptor;
-import org.eclipse.che.plugin.maven.client.project.PomNodeInterceptor;
+import org.eclipse.che.plugin.maven.client.preference.MavenPreferencePresenter;
+import org.eclipse.che.plugin.maven.client.project.ResolvingMavenProjectStateHolder;
+import org.eclipse.che.plugin.maven.client.resource.MavenProjectInterceptor;
+import org.eclipse.che.plugin.maven.client.resource.MavenSourceFolderInterceptor;
+import org.eclipse.che.plugin.maven.client.resource.PomInterceptor;
 import org.eclipse.che.plugin.maven.client.wizard.MavenProjectWizardRegistrar;
 
 /**
@@ -35,17 +39,32 @@ import org.eclipse.che.plugin.maven.client.wizard.MavenProjectWizardRegistrar;
 @ExtensionGinModule
 public class MavenGinModule extends AbstractGinModule {
 
-    /** {@inheritDoc} */
-    @Override
-    protected void configure() {
-        GinMultibinder.newSetBinder(binder(), ProjectWizardRegistrar.class).addBinding().to(MavenProjectWizardRegistrar.class);
-        GinMultibinder.newSetBinder(binder(), CommandType.class).addBinding().to(MavenCommandType.class);
+  @Override
+  protected void configure() {
+    newSetBinder(binder(), ProjectWizardRegistrar.class)
+        .addBinding()
+        .to(MavenProjectWizardRegistrar.class);
 
-        GinMultibinder.newSetBinder(binder(), NodeInterceptor.class).addBinding().to(MavenContentRootInterceptor.class);
-        GinMultibinder.newSetBinder(binder(), NodeInterceptor.class).addBinding().to(MavenExternalLibrariesInterceptor.class);
-        GinMultibinder.newSetBinder(binder(), NodeInterceptor.class).addBinding().to(PomNodeInterceptor.class);
+    newSetBinder(binder(), CommandType.class).addBinding().to(MavenCommandType.class);
 
-        install(new GinFactoryModuleBuilder().build(PomReconsilingStrategyFactory.class));
-        install(new GinFactoryModuleBuilder().build(PomEditorConfigurationFactory.class));
-    }
+    newSetBinder(binder(), PreferencePagePresenter.class)
+        .addBinding()
+        .to(MavenPreferencePresenter.class);
+
+    newSetBinder(binder(), ResourceInterceptor.class)
+        .addBinding()
+        .to(MavenSourceFolderInterceptor.class);
+    newSetBinder(binder(), ResourceInterceptor.class).addBinding().to(PomInterceptor.class);
+    newSetBinder(binder(), ResourceInterceptor.class)
+        .addBinding()
+        .to(MavenProjectInterceptor.class);
+
+    newSetBinder(binder(), ResolvingProjectStateHolder.class)
+        .addBinding()
+        .to(ResolvingMavenProjectStateHolder.class);
+
+    newSetBinder(binder(), LanguageDescription.class)
+        .addBinding()
+        .toProvider(MavenLanguageDescriptionProvider.class);
+  }
 }

@@ -1,81 +1,86 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.api.workspace.server.model.impl.stack;
 
+import java.util.Objects;
+import javax.persistence.Column;
+import javax.persistence.Embeddable;
 import org.eclipse.che.api.workspace.shared.stack.StackComponent;
 
-import java.util.Objects;
-
 /**
- * Server implementation of {@link StackComponent}
+ * OldServer implementation of {@link StackComponent}
  *
  * @author Alexander Andrienko
  */
+@Embeddable
 public class StackComponentImpl implements StackComponent {
 
-    private String name;
-    private String version;
+  @Column(name = "name")
+  private String name;
 
-    public StackComponentImpl(StackComponent stackComponent) {
-        this(stackComponent.getName(), stackComponent.getVersion());
-    }
+  @Column(name = "version")
+  private String version;
 
-    public StackComponentImpl(String name, String version) {
-        this.name = name;
-        this.version = version;
-    }
+  public StackComponentImpl() {}
 
-    @Override
-    public String getName() {
-        return name;
-    }
+  public StackComponentImpl(StackComponent stackComponent) {
+    this(stackComponent.getName(), stackComponent.getVersion());
+  }
 
-    public void setName(String name) {
-        this.name = name;
-    }
+  public StackComponentImpl(String name, String version) {
+    this.name = name;
+    this.version = version;
+  }
 
-    @Override
-    public String getVersion() {
-        return version;
-    }
+  @Override
+  public String getName() {
+    return name;
+  }
 
-    public void setVersion(String version) {
-        this.version = version;
-    }
+  public void setName(String name) {
+    this.name = name;
+  }
 
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (!(obj instanceof StackComponentImpl)) {
-            return false;
-        }
-        StackComponentImpl another = (StackComponentImpl)obj;
-        return Objects.equals(name, another.name) && Objects.equals(version, another.version);
-    }
+  @Override
+  public String getVersion() {
+    return version;
+  }
 
-    @Override
-    public int hashCode() {
-        int hash = 7;
-        hash = hash * 31 + Objects.hashCode(name);
-        hash = hash * 31 + Objects.hashCode(version);
-        return hash;
-    }
+  public void setVersion(String version) {
+    this.version = version;
+  }
 
-    @Override
-    public String toString() {
-        return "StackComponentImpl{" +
-               "name='" + name + '\'' +
-               ", version='" + version + '\'' +
-               '}';
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
     }
+    if (!(obj instanceof StackComponentImpl)) {
+      return false;
+    }
+    StackComponentImpl another = (StackComponentImpl) obj;
+    return Objects.equals(name, another.name) && Objects.equals(version, another.version);
+  }
+
+  @Override
+  public int hashCode() {
+    int hash = 7;
+    hash = hash * 31 + Objects.hashCode(name);
+    hash = hash * 31 + Objects.hashCode(version);
+    return hash;
+  }
+
+  @Override
+  public String toString() {
+    return "StackComponentImpl{" + "name='" + name + '\'' + ", version='" + version + '\'' + '}';
+  }
 }

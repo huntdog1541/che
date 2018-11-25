@@ -12,16 +12,15 @@ che-roundimage()
   border-radius 50%
 
 che-developers-face()
-  che-roundimage()
   box-shadow-simple()
-  height 20px
-  width 20px
+  border-radius 1px
+  height 14px
+  width 14px
   padding 0
 
 @import '../../bower_components/bootstrap-stylus/bootstrap/index'
 @import '../components/widget'
 @import '../components/codemirror/codemirror'
-@import 'projects/projects-config'
 
 $che-logs-output-font = "Droid Sans Mono", monospace
 
@@ -38,22 +37,26 @@ $che-logs-output-font = "Droid Sans Mono", monospace
   background-color $menu-bg-color
 
 md-sidenav.dark-menu-bg
-  overflow auto
+  overflow hidden
 
   img.pull-right
     width 50px
 
 md-sidenav
   box-shadow none !important
-  width 230px
+  width 200px
+  min-width 200px
+
+md-sidenav > *
+  width 200px
+  min-width 200px
 
 html
-
 body
   font-size 13px
   font-family 'Open Sans'
   background-color $background-site-color
-
+  min-width 600px
 
 button,
 select,
@@ -63,7 +66,7 @@ input
   font-family 'Open Sans'
 
 label
- margin-bottom 0
+  margin-bottom 0
 
 .h1 .small, .h1 small, .h2 .small, .h2 small, .h3 .small, .h3 small, h1 .small, h1 small, h2 .small, h2 small, h3 .small, h3 small, h4 .small, h4 small, h5 .small, .h5 small, h6 small, h6 .small
   font-size 65%
@@ -73,10 +76,12 @@ label
   font-weight normal !important
 
 md-divider
-  border-top-color #454F5F !important
+  border-top-color #353E5D !important
+  margin 0 10px
 
 md-toolbar
   font-size 1em
+  flex 1
 
 md-option
   padding 5px
@@ -85,14 +90,21 @@ md-option
 md-option:hover
   background-color $hover-on-list-color
 
-.sidebar-entry
-  margin-left auto
+.md-open-menu-container
+  transition none !important
+
+  md-menu-item
+    transition none !important
 
 .main-page
-  max-width 1296px
   min-width 320px
-  margin-right auto
 
+.progress-line
+  position absolute
+  left 0
+  right 0
+  height 5px
+  z-index 80
 
 .main-page-loader
   position absolute
@@ -105,25 +117,19 @@ md-option:hover
   background-color black
   z-index 80
 
-.main-page-loader-content
-  display inline-block
-  position fixed
-  top 0
-  bottom 0
-  left 0
-  right 0
-  width 120px
-  height 120px
-  margin auto
-  z-index: 86;
-
+  .ide-page-loader-content img
+    position fixed
+    top 0
+    bottom 0
+    left 0
+    right 0
+    margin auto
 
 .not-visible
   visibility hidden
+
 // injector
 // endinjector
-
-
 
 .che-logo
   width 137px
@@ -150,9 +156,12 @@ md-option:hover
   opacity 1
 
 @keyframes popInEffect
-  0% { opacity: 0}
-  100% { opacity: 1}
-
+  0% {
+    opacity: 0
+  }
+  100% {
+    opacity: 1
+  }
 
 /*
 .ide-show.ng-hide-remove
@@ -169,20 +178,17 @@ md-option:hover
 
 ::-webkit-scrollbar-track
   border-radius 5px
-  background rgba(0,0,0,0.1)
-
+  background rgba(0, 0, 0, 0.1)
 
 ::-webkit-scrollbar-thumb
   border-radius 5px
-  background rgba(0,0,0,0.2)
-
+  background rgba(0, 0, 0, 0.2)
 
 ::-webkit-scrollbar-thumb:hover
-  background rgba(0,0,0,0.4)
+  background rgba(0, 0, 0, 0.4)
 
 ::-webkit-scrollbar-thumb:window-inactive
-  background rgba(0,0,0,0.05)
-
+  background rgba(0, 0, 0, 0.05)
 
 .spinner
   width 120px
@@ -202,17 +208,14 @@ md-option:hover
 .spinner .rect2
   animation-delay -1.1s
 
-
 .spinner .rect3
   animation-delay -1.0s
-
 
 @-webkit-keyframes sk-stretchdelay
   0%, 40%, 100%
     -webkit-transform scaleY(0.4)
   20%
     -webkit-transform scaleY(1.0)
-
 
 @keyframes sk-stretchdelay
   0%, 40%, 100%
@@ -224,3 +227,30 @@ md-option:hover
 
 .logo-color-white .outer-fill
   fill $che-white-color
+
+.noselect
+  user-select none
+
+md-tabs-canvas md-tab-item.md-tab.md-active
+  border-bottom 5px solid #fdb940
+  height 100%
+
+.error
+  color $error-color
+
+md-tabs-wrapper
+  z-index 1
+  md-tab-item
+    background-color inherit !important
+    .error-state
+      color $error-color !important
+      position absolute
+      display inline-block
+      font-size 14px
+      margin-top 5px
+      margin-left -15px
+
+.popover
+  font-family 'Open Sans'
+  font-size 12px
+  border-radius 2px

@@ -1,98 +1,114 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.ide.ext.gwt.client.command;
 
 import com.google.gwt.user.client.ui.AcceptsOneWidget;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-
-import org.eclipse.che.ide.extension.machine.client.command.CommandConfigurationPage;
-
-import javax.validation.constraints.NotNull;
+import org.eclipse.che.ide.api.command.CommandImpl;
+import org.eclipse.che.ide.api.command.CommandPage;
 
 /**
- * Page allows to configure GWT command parameters.
+ * Page allows to customize command of {@link GwtCommandType}.
  *
  * @author Artem Zatsarynnyi
  */
 @Singleton
-public class GwtCommandPagePresenter implements GwtCommandPageView.ActionDelegate, CommandConfigurationPage<GwtCommandConfiguration> {
+public class GwtCommandPagePresenter implements GwtCommandPageView.ActionDelegate, CommandPage {
 
-    private final GwtCommandPageView view;
+  private final GwtCommandPageView view;
 
-    private GwtCommandConfiguration  editedConfiguration;
-    /** Working directory value before any editing. */
-    private String                   originWorkingDirectory;
-    /** GWT module value before any editing. */
-    private String                   originGwtModule;
-    /** Code server address value before any editing. */
-    private String                   originCodeServerAddress;
-    private DirtyStateListener       listener;
-    private FieldStateActionDelegate delegate;
+  private CommandImpl editedCommand;
+  private GwtCommandModel editedCommandModel;
 
-    @Inject
-    public GwtCommandPagePresenter(GwtCommandPageView view) {
-        this.view = view;
-        view.setDelegate(this);
-    }
+  // initial value of the 'working directory' parameter
+  private String workingDirectoryInitial;
+  // initial value of the 'GWT module' parameter
+  private String gwtModuleInitial;
+  // initial value of the 'Code Server address' parameter
+  private String codeServerAddressInitial;
 
-    @Override
-    public void resetFrom(@NotNull GwtCommandConfiguration configuration) {
-        editedConfiguration = configuration;
-        originWorkingDirectory = configuration.getWorkingDirectory();
-        originGwtModule = configuration.getGwtModule();
-        originCodeServerAddress = configuration.getCodeServerAddress();
-    }
+  private DirtyStateListener listener;
 
-    @Override
-    public void go(AcceptsOneWidget container) {
-        container.setWidget(view);
+  @Inject
+  public GwtCommandPagePresenter(GwtCommandPageView view) {
+    this.view = view;
 
-        view.setWorkingDirectory(editedConfiguration.getWorkingDirectory());
-        view.setGwtModule(editedConfiguration.getGwtModule());
-        view.setCodeServerAddress(editedConfiguration.getCodeServerAddress());
-    }
+    view.setDelegate(this);
+  }
 
-    @Override
-    public boolean isDirty() {
-        return !(originWorkingDirectory.equals(editedConfiguration.getWorkingDirectory()) &&
-                 originGwtModule.equals(editedConfiguration.getGwtModule()) &&
-                 originCodeServerAddress.equals(editedConfiguration.getCodeServerAddress()));
-    }
+  @Override
+  public void resetFrom(CommandImpl command) {
+    editedCommand = command;
 
-    @Override
-    public void setDirtyStateListener(@NotNull DirtyStateListener listener) {
-        this.listener = listener;
-    }
+    editedCommandModel = GwtCommandModel.fromCommandLine(command.getCommandLine());
 
-    @Override
-    public void setFieldStateActionDelegate(FieldStateActionDelegate delegate) {
-        this.delegate = delegate;
-    }
+    workingDirectoryInitial = editedCommandModel.getWorkingDirectory();
+    gwtModuleInitial = editedCommandModel.getGwtModule();
+    codeServerAddressInitial = editedCommandModel.getCodeServerAddress();
+  }
 
-    @Override
-    public void onWorkingDirectoryChanged() {
-        editedConfiguration.setWorkingDirectory(view.getWorkingDirectory());
-        listener.onDirtyStateChanged();
-    }
+  @Override
+  public void go(AcceptsOneWidget container) {
+    container.setWidget(view);
 
-    @Override
-    public void onGwtModuleChanged() {
-        editedConfiguration.setGwtModule(view.getGwtModule());
-        listener.onDirtyStateChanged();
-    }
+    view.setWorkingDirectory(editedCommandModel.getWorkingDirectory());
+    view.setGwtModule(editedCommandModel.getGwtModule());
+    view.setCodeServerAddress(editedCommandModel.getCodeServerAddress());
+  }
 
-    @Override
-    public void onCodeServerAddressChanged() {
-        editedConfiguration.setCodeServerAddress(view.getCodeServerAddress());
-        listener.onDirtyStateChanged();
-    }
+  @Override
+  public void onSave() {
+    workingDirectoryInitial = editedCommandModel.getWorkingDirectory();
+    gwtModuleInitial = editedCommandModel.getGwtModule();
+    codeServerAddressInitial = editedCommandModel.getCodeServerAddress();
+  }
+
+  @Override
+  public boolean isDirty() {
+    return !(workingDirectoryInitial.equals(editedCommandModel.getWorkingDirectory())
+        && gwtModuleInitial.equals(editedCommandModel.getGwtModule())
+        && codeServerAddressInitial.equals(editedCommandModel.getCodeServerAddress()));
+  }
+
+  @Override
+  public void setDirtyStateListener(DirtyStateListener listener) {
+    this.listener = listener;
+  }
+
+  @Override
+  public void setFieldStateActionDelegate(FieldStateActionDelegate delegate) {}
+
+  @Override
+  public void onWorkingDirectoryChanged() {
+    editedCommandModel.setWorkingDirectory(view.getWorkingDirectory());
+
+    editedCommand.setCommandLine(editedCommandModel.toCommandLine());
+    listener.onDirtyStateChanged();
+  }
+
+  @Override
+  public void onGwtModuleChanged() {
+    editedCommandModel.setGwtModule(view.getGwtModule());
+
+    editedCommand.setCommandLine(editedCommandModel.toCommandLine());
+    listener.onDirtyStateChanged();
+  }
+
+  @Override
+  public void onCodeServerAddressChanged() {
+    editedCommandModel.setCodeServerAddress(view.getCodeServerAddress());
+
+    editedCommand.setCommandLine(editedCommandModel.toCommandLine());
+    listener.onDirtyStateChanged();
+  }
 }

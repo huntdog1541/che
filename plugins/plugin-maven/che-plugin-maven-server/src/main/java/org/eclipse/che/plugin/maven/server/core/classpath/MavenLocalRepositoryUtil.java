@@ -1,18 +1,18 @@
-/*******************************************************************************
- * Copyright (c) 2012-2016 Codenvy, S.A.
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+/*
+ * Copyright (c) 2012-2018 Red Hat, Inc.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Codenvy, S.A. - initial API and implementation
- *******************************************************************************/
+ *   Red Hat, Inc. - initial API and implementation
+ */
 package org.eclipse.che.plugin.maven.server.core.classpath;
 
-import org.eclipse.che.maven.data.MavenArtifactKey;
-
 import java.io.File;
+import org.eclipse.che.maven.data.MavenArtifactKey;
 
 /**
  * Util class. Helps to navigate in local maven repository.
@@ -21,31 +21,35 @@ import java.io.File;
  */
 public class MavenLocalRepositoryUtil {
 
-    public static File getFileForArtifact(File localRepo, MavenArtifactKey artifactKey) {
-        return getFileForArtifact(localRepo,
-                                  artifactKey.getGroupId(),
-                                  artifactKey.getArtifactId(),
-                                  artifactKey.getVersion(),
-                                  artifactKey.getClassifier(),
-                                  artifactKey.getPackaging());
+  public static File getFileForArtifact(File localRepo, MavenArtifactKey artifactKey) {
+    return getFileForArtifact(
+        localRepo,
+        artifactKey.getGroupId(),
+        artifactKey.getArtifactId(),
+        artifactKey.getVersion(),
+        artifactKey.getClassifier(),
+        artifactKey.getPackaging());
+  }
+
+  public static File getFileForArtifact(
+      File localRepo,
+      String groupId,
+      String artifactId,
+      String version,
+      String classifier,
+      String packaging) {
+    String artifactPath = groupId.replace('.', '/') + "/" + artifactId + "/" + version;
+
+    File artifactDir = new File(localRepo, artifactPath);
+    String artifactName = artifactId + "-" + version;
+
+    if (classifier != null) {
+      artifactName += "-" + classifier;
     }
 
-    public static File getFileForArtifact(File localRepo, String groupId, String artifactId, String version, String classifier,
-                                          String packaging) {
-        String artifactPath =
-                groupId.replace('.', '/') + "/" + artifactId + "/" + version;
-
-        File artifactDir = new File(localRepo, artifactPath);
-        String artifactName = artifactId + "-" + version;
-
-        if (classifier != null) {
-            artifactName += "-" + classifier;
-        }
-
-        if (packaging == null) {
-            packaging = "jar";
-        }
-        return new File(artifactDir, artifactName + "." + packaging);
-
+    if (packaging == null) {
+      packaging = "jar";
     }
+    return new File(artifactDir, artifactName + "." + packaging);
+  }
 }
